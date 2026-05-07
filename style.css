@@ -41,6 +41,13 @@ html, body {
   padding: 0 24px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+  position: relative;
+}
+#topbar img {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 #topbar .title {
   font-size: 13px;
@@ -225,6 +232,7 @@ p {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+  background: var(--surface);
 }
 .bench-panel-header {
   padding: 10px 16px;

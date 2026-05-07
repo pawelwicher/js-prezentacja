@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>03 — Kompilacja w V8 | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    .pipeline-svg-box {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .pipeline-svg-box svg { display: block; width: 100%; height: auto; }
+
+    .three-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      width: 100%;
+    }
+    .info-panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .info-panel-header {
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      border-bottom: 1px solid var(--border);
+    }
+    .info-panel-header.blue   { background: var(--accent-light); color: var(--accent); }
+    .info-panel-header.red    { background: var(--red-light); color: var(--red); }
+    .info-panel-header.yellow { background: var(--yellow-light); color: var(--yellow); }
+    .info-panel-body {
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .info-item {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.55;
+      display: flex;
+      gap: 7px;
+    }
+    .info-item::before { content: "•"; color: var(--border); flex-shrink: 0; margin-top: 1px; }
+    .info-item strong { color: var(--text); }
+    .info-item code {
+      font-family: var(--mono);
+      font-size: 11px;
+      background: #f3f4f6;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <span class="slide-tag">03 — Silnik V8</span>
+    <h1>Kompilacja kodu JS w V8</h1>
+
+    <!-- Pipeline diagram -->
+    <div class="pipeline-svg-box">
+      <svg viewBox="0 0 780 155" xmlns="http://www.w3.org/2000/svg"
+           font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#9ca3af"/>
+          </marker>
+          <marker id="arr-r" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#dc2626"/>
+          </marker>
+        </defs>
+
+        <!-- Source -->
+        <rect x="10" y="50" width="80" height="56" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+        <text x="50" y="75" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">Kod</text>
+        <text x="50" y="90" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">źródłowy</text>
+
+        <line x1="91" y1="78" x2="112" y2="78" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Parser -->
+        <rect x="113" y="50" width="88" height="56" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+        <text x="157" y="73" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">Parser</text>
+        <text x="157" y="88" text-anchor="middle" font-size="10" fill="#6b7280">Scanner → AST</text>
+        <text x="157" y="100" text-anchor="middle" font-size="10" fill="#6b7280">lazy parsing</text>
+
+        <line x1="202" y1="78" x2="223" y2="78" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Ignition -->
+        <rect x="224" y="40" width="105" height="76" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+        <text x="276" y="62" text-anchor="middle" font-size="11" font-weight="700" fill="#1d4ed8">Ignition</text>
+        <text x="276" y="77" text-anchor="middle" font-size="10" fill="#3b82f6">interpreter bytecode</text>
+        <text x="276" y="91" text-anchor="middle" font-size="10" fill="#3b82f6">zbiera feedback</text>
+        <text x="276" y="105" text-anchor="middle" font-size="10" fill="#3b82f6">o typach i kształtach</text>
+
+        <line x1="330" y1="78" x2="351" y2="78" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Sparkplug -->
+        <rect x="352" y="50" width="100" height="56" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+        <text x="402" y="73" text-anchor="middle" font-size="11" font-weight="700" fill="#15803d">Sparkplug</text>
+        <text x="402" y="88" text-anchor="middle" font-size="10" fill="#16a34a">kod natywny</text>
+        <text x="402" y="101" text-anchor="middle" font-size="10" fill="#16a34a">bez optymalizacji</text>
+
+        <line x1="453" y1="78" x2="474" y2="78" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Maglev -->
+        <rect x="475" y="50" width="100" height="56" rx="6" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+        <text x="525" y="73" text-anchor="middle" font-size="11" font-weight="700" fill="#d97706">Maglev</text>
+        <text x="525" y="88" text-anchor="middle" font-size="10" fill="#d97706">kod natywny</text>
+        <text x="525" y="101" text-anchor="middle" font-size="10" fill="#d97706">podstawowe opt.</text>
+
+        <line x1="576" y1="78" x2="597" y2="78" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- TurboFan -->
+        <rect x="598" y="40" width="110" height="76" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+        <text x="653" y="62" text-anchor="middle" font-size="11" font-weight="700" fill="#dc2626">TurboFan</text>
+        <text x="653" y="77" text-anchor="middle" font-size="10" fill="#dc2626">kod natywny</text>
+        <text x="653" y="91" text-anchor="middle" font-size="10" fill="#dc2626">pełna optymalizacja</text>
+        <text x="653" y="105" text-anchor="middle" font-size="10" fill="#dc2626">spekulatywna</text>
+
+        <!-- deopt arrow -->
+        <path d="M 653 40 Q 653 16 276 16 Q 276 39" stroke="#dc2626" stroke-width="1.5"
+              fill="none" stroke-dasharray="5 3" marker-end="url(#arr-r)"/>
+        <text x="464" y="11" text-anchor="middle" font-size="10" fill="#dc2626" font-weight="600">deoptymalizacja → powrót do bytecode'u</text>
+
+        <!-- tier labels -->
+        <text x="402" y="142" text-anchor="middle" font-size="10" fill="#9ca3af">kilka wywołań</text>
+        <text x="525" y="142" text-anchor="middle" font-size="10" fill="#9ca3af">częste wywołania</text>
+        <text x="653" y="142" text-anchor="middle" font-size="10" fill="#9ca3af">gorący kod</text>
+      </svg>
+    </div>
+
+    <!-- Three info panels -->
+    <div class="three-col">
+      <div class="info-panel">
+        <div class="info-panel-header blue">Strategia tier-up</div>
+        <div class="info-panel-body">
+          <div class="info-item">V8 stosuje podejście <strong>„kompiluj tyle, ile trzeba"</strong> — funkcja wywołana raz pozostaje w Ignition, gorący kod trafia do TurboFan</div>
+          <div class="info-item"><strong>Lazy parsing</strong> — funkcje niewywoływane od razu są jedynie wstępnie parsowane; pełny AST budowany jest przy pierwszym wywołaniu</div>
+          <div class="info-item">Maglev i TurboFan kompilują <strong>w wątkach tła</strong> — główny wątek JS nie jest blokowany</div>
+        </div>
+      </div>
+      <div class="info-panel">
+        <div class="info-panel-header yellow">Feedback vector</div>
+        <div class="info-panel-body">
+          <div class="info-item">Ignition podczas interpretacji zbiera dane o <strong>typach argumentów</strong>, kształtach obiektów i częstości gałęzi</div>
+          <div class="info-item">Dane trafiają do <strong>feedback vector</strong> powiązanego z każdą funkcją</div>
+          <div class="info-item">Maglev i TurboFan generują kod wyspecjalizowany dla zaobserwowanych typów — jeśli założenia się nie sprawdzą, następuje <strong>deoptymalizacja</strong></div>
+        </div>
+      </div>
+      <div class="info-panel">
+        <div class="info-panel-header red">Deoptymalizacja</div>
+        <div class="info-panel-body">
+          <div class="info-item">Optymalizacje są <strong>spekulatywne</strong> — złamanie założeń (np. inny typ argumentu) powoduje powrót do bytecode'u przez mechanizm <strong>OSR</strong></div>
+          <div class="info-item">Częste deopty to klasyczny problem wydajnościowy — unikaj przez <strong>stałe typy argumentów</strong> i stały kształt obiektów</div>
+          <div class="info-item">Diagnostyka: <code>--trace-deopt</code> w Node.js lub zakładka <em>Performance</em> w Chrome DevTools</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>initNav(4); hljs.highlightAll();</script>
+</body>
+</html>

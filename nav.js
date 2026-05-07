@@ -1,9 +1,13 @@
 const SLIDES = [
+  '00-tytul.html',
   '01-wstep.html',
-  '02-pamiec.html',
-  '03-v8.html',
-  '04-liczby.html',
-  '05-deduplikacja.html',
+  '02-teoria.html',
+  '03-pamiec.html',
+  '04-kompilacjav8.html',
+  '05-liczby.html',
+  '06-tablice.html',
+  '07-przyklady.html',
+  '08-deduplikacja.html',
 ];
 
 const TOTAL = SLIDES.length;

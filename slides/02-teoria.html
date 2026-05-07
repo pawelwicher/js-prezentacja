@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>02 — Teoria | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    .theory-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      width: 100%;
+    }
+    .theory-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      cursor: default;
+      transition: box-shadow 200ms, transform 200ms;
+    }
+    .theory-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,.08);
+      transform: translateY(-2px);
+    }
+    .theory-card-header {
+      padding: 20px 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .theory-card-icon {
+      font-size: 28px;
+      line-height: 1;
+    }
+    .theory-card-num {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .theory-card-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -.01em;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .theory-card-body {
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+    .theory-item {
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      gap: 8px;
+      line-height: 1.5;
+    }
+    .theory-item::before {
+      content: "→";
+      flex-shrink: 0;
+      font-size: 12px;
+      margin-top: 1px;
+    }
+    .theory-item strong { color: var(--text); }
+    .theory-card-footer {
+      padding: 10px 20px;
+      font-size: 12px;
+      font-weight: 600;
+      border-top: 1px solid var(--border);
+    }
+
+    .card-memory .theory-card-num   { color: var(--yellow); }
+    .card-memory .theory-item::before { color: var(--yellow); }
+    .card-memory .theory-card-footer  { background: var(--yellow-light); color: var(--yellow); }
+
+    .card-v8 .theory-card-num        { color: var(--accent); }
+    .card-v8 .theory-item::before    { color: var(--accent); }
+    .card-v8 .theory-card-footer     { background: var(--accent-light); color: var(--accent); }
+
+    .card-numbers .theory-card-num      { color: var(--green); }
+    .card-numbers .theory-item::before  { color: var(--green); }
+    .card-numbers .theory-card-footer   { background: var(--green-light); color: var(--green); }
+
+    .card-arrays .theory-card-num       { color: var(--red); }
+    .card-arrays .theory-item::before   { color: var(--red); }
+    .card-arrays .theory-card-footer    { background: var(--red-light); color: var(--red); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <span class="slide-tag">02 — Teoria</span>
+    <h1>Co omówimy?</h1>
+
+    <div class="theory-grid">
+
+      <div class="theory-card card-memory">
+        <div class="theory-card-header">
+          <span class="theory-card-icon">🧠</span>
+          <span class="theory-card-num">Slajd 03</span>
+          <span class="theory-card-title">Zarządzanie pamięcią</span>
+        </div>
+        <div class="theory-card-body">
+          <div class="theory-item">Stos i sterta — czym różni się alokacja prymitywów od obiektów</div>
+          <div class="theory-item">Garbage collector — algorytm <strong>mark-and-sweep</strong> i osiągalność od rootów</div>
+          <div class="theory-item"><strong>Generational GC</strong> — young generation (Scavenge) i old generation (Mark-Sweep-Compact)</div>
+          <div class="theory-item">Popularne wzorce wycieków pamięci i jak je diagnozować</div>
+        </div>
+        <div class="theory-card-footer">DevTools → Memory tab</div>
+      </div>
+
+      <div class="theory-card card-v8">
+        <div class="theory-card-header">
+          <span class="theory-card-icon">⚙️</span>
+          <span class="theory-card-num">Slajd 04</span>
+          <span class="theory-card-title">Kompilacja w V8</span>
+        </div>
+        <div class="theory-card-body">
+          <div class="theory-item">Wielowarstwowy potok: <strong>Ignition → Sparkplug → Maglev → TurboFan</strong></div>
+          <div class="theory-item">Strategia tier-up — kod awansuje do kolejnych warstw w miarę jak staje się „gorący"</div>
+          <div class="theory-item"><strong>Feedback vector</strong> — jak interpreter zbiera dane o typach dla JIT</div>
+          <div class="theory-item">Deoptymalizacja — kiedy spekulatywne założenia są łamane i jaki to ma koszt</div>
+        </div>
+        <div class="theory-card-footer">DevTools → Performance tab</div>
+      </div>
+
+      <div class="theory-card card-numbers">
+        <div class="theory-card-header">
+          <span class="theory-card-icon">🔢</span>
+          <span class="theory-card-num">Slajd 05</span>
+          <span class="theory-card-title">Liczby w JS</span>
+        </div>
+        <div class="theory-card-body">
+          <div class="theory-item">IEEE 754 double — jak V8 reprezentuje liczby zmiennoprzecinkowe</div>
+          <div class="theory-item"><strong>SMI</strong> (Small Integer) — małe liczby całkowite bez alokacji na stercie</div>
+          <div class="theory-item"><strong>HeapNumber</strong> — kiedy liczba trafia na stertę i co to oznacza dla GC</div>
+          <div class="theory-item">TypedArray jako wydajniejsza alternatywa dla danych liczbowych</div>
+        </div>
+        <div class="theory-card-footer">Powiązane z GC i JIT</div>
+      </div>
+
+      <div class="theory-card card-arrays">
+        <div class="theory-card-header">
+          <span class="theory-card-icon">📦</span>
+          <span class="theory-card-num">Slajd 06</span>
+          <span class="theory-card-title">Tablice w V8</span>
+        </div>
+        <div class="theory-card-body">
+          <div class="theory-item"><strong>Elements Kinds</strong> — jak V8 śledzi typ elementów tablicy i co to oznacza dla JIT</div>
+          <div class="theory-item"><strong>PACKED_SMI → PACKED_DOUBLE → PACKED_ELEMENTS</strong> — przejścia jednokierunkowe, każde obniża wydajność</div>
+          <div class="theory-item"><strong>Packed vs Holey</strong> — dziury wymuszają sprawdzanie prototypu przy każdym odczycie</div>
+          <div class="theory-item">Jak pisać kod, który nie wymusza degradacji tablicy</div>
+        </div>
+        <div class="theory-card-footer">node --allow-natives-syntax</div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>initNav(2);</script>
+</body>
+</html>

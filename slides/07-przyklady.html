@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>07 — Przykłady praktyczne | Optymalizacja JS — silnik V8</title>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    .placeholder-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      width: 100%;
+    }
+    .placeholder-card {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 110px;
+      color: var(--muted);
+    }
+    .placeholder-card .ph-icon {
+      font-size: 22px;
+      opacity: .4;
+    }
+    .placeholder-card .ph-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .tip-bar {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .tip-bar .tip-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .tip-bar .tip-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .tip-bar .tip-text strong { color: var(--text); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <span class="slide-tag">07 — Przykłady</span>
+    <h1>Przykłady praktyczne</h1>
+
+    <div class="placeholder-grid">
+      <div class="placeholder-card">
+        <span class="ph-icon">+</span>
+        <span class="ph-label">temat wkrótce</span>
+      </div>
+      <div class="placeholder-card">
+        <span class="ph-icon">+</span>
+        <span class="ph-label">temat wkrótce</span>
+      </div>
+      <div class="placeholder-card">
+        <span class="ph-icon">+</span>
+        <span class="ph-label">temat wkrótce</span>
+      </div>
+    </div>
+
+    <div class="tip-bar">
+      <span class="tip-icon">▶</span>
+      <span class="tip-text">
+        Kolejne slajdy to <strong>interaktywne benchmarki</strong> — każdy uruchamia się w przeglądarce.
+        Wyniki zależą od silnika i sprzętu, ale proporcje między wariantami są przewidywalne.
+      </span>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>initNav(7);</script>
+</body>
+</html>

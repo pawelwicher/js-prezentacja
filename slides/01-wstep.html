@@ -4,43 +4,165 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>01 — Wstęp | Techniki optymalizacyjne w JS</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
   <link rel="stylesheet" href="../style.css" />
+  <style>
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      width: 100%;
+    }
+    .section-panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .section-panel-header {
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-panel-header.speed  { background: var(--accent-light); color: var(--accent); }
+    .section-panel-header.memory { background: var(--yellow-light);  color: var(--yellow); }
+    .section-panel-body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .item-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .item-desc {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .item-desc code {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      background: #f3f4f6;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .tip-bar {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .tip-bar .tip-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .tip-bar .tip-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .tip-bar .tip-text strong { color: var(--text); }
+  </style>
 </head>
 <body>
 <div id="app">
 
   <div id="topbar">
-    <span class="title">Techniki optymalizacyjne w JS</span>
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
     <span class="counter" id="counter"></span>
   </div>
 
   <div id="slide">
     <span class="slide-tag">01 — Wstęp</span>
-    <h1>Co warto<br/>optymalizować?</h1>
-    <p>Placeholder — treść do uzupełnienia.</p>
-    <div class="card-grid">
-      <div class="card">
-        <div class="card-icon">⏱</div>
-        <div class="card-title">Czas wykonania</div>
-        <div class="card-body">Placeholder</div>
+    <h1>Co warto optymalizować?</h1>
+
+    <div class="two-col">
+
+      <!-- Szybkość -->
+      <div class="section-panel">
+        <div class="section-panel-header speed">⚡ Szybkość działania</div>
+        <div class="section-panel-body">
+          <div class="item">
+            <span class="item-title">Złożoność algorytmiczna</span>
+            <span class="item-desc">Największe zyski. Zagnieżdżone pętle O(n²) na dużych danych potrafią zabić wydajność. <code>Map</code> / <code>Set</code> (O(1)) zamiast <code>Array.includes</code> / <code>indexOf</code> (O(n)).</span>
+          </div>
+          <div class="item">
+            <span class="item-title">Operacje na DOM</span>
+            <span class="item-desc">Drogie — batchuj zmiany, buduj poza DOM-em i wstawiaj raz. Unikaj mieszania odczytu właściwości wymuszających reflow (<code>offsetHeight</code>, <code>getBoundingClientRect</code>) z zapisami.</span>
+          </div>
+          <div class="item">
+            <span class="item-title">Pętle i metody tablicowe</span>
+            <span class="item-desc"><code>for</code> jest zwykle szybszy niż <code>forEach</code> / <code>map</code>. Łańcuchy <code>.filter().map().reduce()</code> iterują tablicę wielokrotnie — przy dużych zbiorach lepsza jest jedna pętla.</span>
+          </div>
+          <div class="item">
+            <span class="item-title">Asynchroniczność</span>
+            <span class="item-desc"><code>Promise.all()</code> zamiast sekwencyjnego <code>await</code> w pętli gdy operacje są niezależne. Ciężkie obliczenia synchroniczne — przenieś do Web Workera.</span>
+          </div>
+          <div class="item">
+            <span class="item-title">Debounce / throttle</span>
+            <span class="item-desc">Dla zdarzeń <code>scroll</code>, <code>resize</code>, <code>input</code> — ogranicza liczbę wywołań handlera.</span>
+          </div>
+          <div class="item">
+            <span class="item-title">JIT-friendly kod</span>
+            <span class="item-desc">V8 lubi obiekty o stałym kształcie (monomorficzne). Dodawanie i usuwanie pól w hot pathach degraduje wydajność przez deoptymalizację.</span>
+          </div>
+        </div>
       </div>
-      <div class="card">
-        <div class="card-icon">🧠</div>
-        <div class="card-title">Zużycie pamięci</div>
-        <div class="card-body">Placeholder</div>
+
+      <!-- Pamięć -->
+      <div class="section-panel">
+        <div class="section-panel-header memory">🧠 Zużycie pamięci</div>
+        <div class="section-panel-body">
+          <div class="item">
+            <span class="item-title">Wycieki pamięci</span>
+            <span class="item-desc">Listenery niewyrejestrowane przy usuwaniu elementu, <code>setInterval</code> trzymający referencje, closures trzymające duże obiekty, przypadkowe zmienne globalne, detached DOM nodes.</span>
+          </div>
+          <div class="item">
+            <span class="item-title">Struktury danych</span>
+            <span class="item-desc"><code>WeakMap</code> / <code>WeakSet</code> gdy klucze mogą być garbage-collected. <code>Map</code> jest pamięciowo cięższy niż zwykły obiekt, ale szybszy przy częstych dodawaniach/usuwaniach.</span>
+          </div>
+          <div class="item">
+            <span class="item-title">Kopiowanie vs mutacja</span>
+            <span class="item-desc">Podejście niemutowalne (<code>{...obj}</code>, <code>[...arr]</code>) jest czyste, ale generuje dużo śmieci. W hot pathach czasem warto mutować lokalnie.</span>
+          </div>
+          <div class="item">
+            <span class="item-title">Stringi i konkatenacja</span>
+            <span class="item-desc">Przy budowaniu długich stringów w pętli <code>array.join('')</code> jest bezpieczniejszy niż <code>+=</code>.</span>
+          </div>
+          <div class="item">
+            <span class="item-title">TypedArray</span>
+            <span class="item-desc"><code>Float32Array</code>, <code>Uint8Array</code> — dużo bardziej kompaktowe niż zwykłe <code>Array</code> przy danych liczbowych.</span>
+          </div>
+          <div class="item">
+            <span class="item-title">Streaming</span>
+            <span class="item-desc">Przy dużych plikach / odpowiedziach API — streamy zamiast wczytywania wszystkiego do pamięci naraz.</span>
+          </div>
+        </div>
       </div>
-      <div class="card">
-        <div class="card-icon">🔁</div>
-        <div class="card-title">Alokacje</div>
-        <div class="card-body">Placeholder</div>
-      </div>
-      <div class="card">
-        <div class="card-icon">🔥</div>
-        <div class="card-title">Hot paths</div>
-        <div class="card-body">Placeholder</div>
-      </div>
+
     </div>
+
+    <div class="tip-bar">
+      <span class="tip-icon">📏</span>
+      <span class="tip-text">
+        <strong>Zanim zaczniesz optymalizować — zmierz.</strong>
+        DevTools Performance i Memory tab pokazują gdzie naprawdę leży problem.
+        Intuicja często zawodzi. Premature optimization to klasyczna pułapka —
+        czytelność kodu jest zwykle ważniejsza niż mikrooptymalizacje, chyba że profiler mówi inaczej.
+      </span>
+    </div>
+
   </div>
 
   <div id="bottombar">
@@ -51,6 +173,6 @@
 
 </div>
 <script src="../nav.js"></script>
-<script>initNav(0);</script>
+<script>initNav(1);</script>
 </body>
 </html>
