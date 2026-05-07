@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>03 — Kompilacja w V8 | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Techniki optymalizacyjne w JS</span>
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <span class="slide-tag">03 — Silnik V8</span>
+    <h1>Kompilacja<br/>w V8</h1>
+    <p>Placeholder — treść do uzupełnienia.</p>
+    <div class="divider"></div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">📝</div>
+        <div class="card-title">Parser</div>
+        <div class="card-body">AST → Ignition bytecode</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔥</div>
+        <div class="card-title">Ignition</div>
+        <div class="card-body">Interpreter — zbiera feedback</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <div class="card-title">Maglev</div>
+        <div class="card-body">Mid-tier JIT (od V8 v11)</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🚀</div>
+        <div class="card-title">TurboFan</div>
+        <div class="card-body">Optimizing JIT compiler</div>
+      </div>
+    </div>
+    <div class="code-block">
+      <div class="cb-header">
+        <span>deoptymalizacja.js</span>
+        <span>placeholder</span>
+      </div>
+      <pre><code class="language-javascript">// Placeholder — fragment kodu do uzupełnienia
+function add(a, b) {
+  return a + b; // monomorphic → fast
+}
+add(1, 2);      // number + number
+add("x", "y"); // deopt — typ się zmienił!</code></pre>
+    </div>
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>initNav(2); hljs.highlightAll();</script>
+</body>
+</html>
