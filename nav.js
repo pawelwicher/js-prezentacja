@@ -11,6 +11,12 @@ const SLIDES = [
   '09-mapandobject.html',
   '10-numberarrays.html',
   '11-hiddenclasses.html',
+  '12-weakmap.html',
+  '13-clone.html',
+  '14-deopt.html',
+  '15-arraybuffer.html',
+  '16-objectpool.html',
+  '17-podsumowanie.html',
 ];
 
 const TOTAL = SLIDES.length;
@@ -46,10 +52,16 @@ function initNav(currentIndex) {
   });
 
   document.addEventListener('keydown', e => {
-    if ((e.key === 'ArrowRight' || e.key === 'ArrowDown') && nextFile) {
+    const slide = document.getElementById('slide');
+    const atBottom = slide.scrollHeight - slide.scrollTop <= slide.clientHeight + 4;
+    const atTop    = slide.scrollTop <= 4;
+
+    if ((e.key === 'ArrowRight' || (e.key === 'ArrowDown' && atBottom)) && nextFile) {
+      e.preventDefault();
       window.location.href = nextFile;
     }
-    if ((e.key === 'ArrowLeft' || e.key === 'ArrowUp') && prevFile) {
+    if ((e.key === 'ArrowLeft' || (e.key === 'ArrowUp' && atTop)) && prevFile) {
+      e.preventDefault();
       window.location.href = prevFile;
     }
   });

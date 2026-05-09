@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>07 — Przykłady praktyczne | Optymalizacja JS — silnik V8</title>
+  <title>07 — Przykłady praktyczne | Techniki optymalizacyjne w JS</title>
   <link rel="stylesheet" href="../style.css" />
   <style>
     .placeholder-grid {
@@ -13,26 +13,39 @@
       width: 100%;
     }
     .placeholder-card {
-      border: 2px dashed var(--border);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
-      background: var(--bg);
-      padding: 24px 16px;
+      background: var(--surface);
+      padding: 20px 16px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 6px;
       min-height: 110px;
-      color: var(--muted);
+      color: var(--text);
+      text-decoration: none;
+      transition: box-shadow 200ms, transform 200ms, border-color 200ms;
+      cursor: pointer;
+    }
+    .placeholder-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,.08);
+      transform: translateY(-2px);
+      border-color: var(--accent);
     }
     .placeholder-card .ph-icon {
-      font-size: 22px;
-      opacity: .4;
+      font-size: 24px;
     }
     .placeholder-card .ph-label {
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .placeholder-card .ph-desc {
+      font-size: 11.5px;
       color: var(--muted);
+      text-align: center;
+      line-height: 1.5;
     }
     .tip-bar {
       width: 100%;
@@ -62,18 +75,36 @@
     <h1>Przykłady praktyczne</h1>
 
     <div class="placeholder-grid">
-      <div class="placeholder-card">
-        <span class="ph-icon">+</span>
-        <span class="ph-label">temat wkrótce</span>
-      </div>
-      <div class="placeholder-card">
-        <span class="ph-icon">+</span>
-        <span class="ph-label">temat wkrótce</span>
-      </div>
-      <div class="placeholder-card">
-        <span class="ph-icon">+</span>
-        <span class="ph-label">temat wkrótce</span>
-      </div>
+      <a class="placeholder-card" href="08-setandarray.html">
+        <span class="ph-icon">🔍</span>
+        <span class="ph-label">Set vs Array</span>
+        <span class="ph-desc">has() O(1) vs includes() O(n) · deduplikacja</span>
+      </a>
+      <a class="placeholder-card" href="09-mapandobject.html">
+        <span class="ph-icon">🗺️</span>
+        <span class="ph-label">Map vs Object</span>
+        <span class="ph-desc">rotacja kluczy · iteracja · dictionary mode</span>
+      </a>
+      <a class="placeholder-card" href="10-numberarrays.html">
+        <span class="ph-icon">📦</span>
+        <span class="ph-label">Elements Kinds</span>
+        <span class="ph-desc">PACKED_SMI vs HOLEY vs DICTIONARY</span>
+      </a>
+      <a class="placeholder-card" href="11-hiddenclasses.html">
+        <span class="ph-icon">🧩</span>
+        <span class="ph-label">Hidden Classes</span>
+        <span class="ph-desc">mono / poly / megamorphic IC</span>
+      </a>
+      <a class="placeholder-card" href="13-clone.html">
+        <span class="ph-icon">📋</span>
+        <span class="ph-label">Klonowanie obiektów</span>
+        <span class="ph-desc">spread · structuredClone · JSON</span>
+      </a>
+      <a class="placeholder-card" href="16-objectpool.html">
+        <span class="ph-icon">♻️</span>
+        <span class="ph-label">Object Pooling</span>
+        <span class="ph-desc">zero alokacji w hot path · mniej GC</span>
+      </a>
     </div>
 
     <div class="tip-bar">

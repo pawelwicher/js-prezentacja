@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>15 — TypedArray — pamięć | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    .mem-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .mem-table th {
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .mem-table th.num { text-align: right; }
+    .mem-table td {
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+    }
+    .mem-table td.num { text-align: right; font-family: var(--mono); font-size: 11px; }
+    .mem-table tr:last-child td { border-bottom: none; }
+    .mem-table tr:hover td { background: var(--surface); }
+    .tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
+    .tag-green { background: #dcfce7; color: #166534; }
+    .tag-yellow { background: #fef9c3; color: #854d0e; }
+    .tag-red { background: #fee2e2; color: #991b1b; }
+    .bar-cell { width: 120px; }
+    .inline-bar { height: 10px; border-radius: 2px; display: inline-block; vertical-align: middle; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <h2>TypedArray — zużycie pamięci</h2>
+
+    <!-- Jak V8 przechowuje liczby w Array -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">JAK V8 PRZECHOWUJE LICZBY W ZWYKŁEJ TABLICY</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.8;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>SMI_ELEMENTS</strong> — liczby całkowite mieszczące się w 31 bitach; trzymane bezpośrednio jako tagged integer, <strong>bez alokacji na stercie</strong></div>
+          <div><strong>DOUBLE_ELEMENTS</strong> — floaty lub duże inty; V8 unboxuje je do ciągłego bloku (<em>FixedDoubleArray</em>), ~8 B/element — zbliżone do Float64Array</div>
+          <div><strong>OBJECT_ELEMENTS</strong> — mieszane typy lub po wrzuceniu <code style="font-family:var(--mono);font-size:11px">null</code> / stringa; każda liczba pakowana do <em>HeapNumber</em> na stercie — pointer (8 B) + nagłówek + wartość = <strong>~32 B/element</strong></div>
+          <div style="background:#fef9c3;border-radius:4px;padding:6px 10px;margin-top:2px;font-size:11px;"><strong>Pułapka:</strong> jedna operacja <code style="font-family:var(--mono);font-size:11px">arr.push(null)</code> lub <code style="font-family:var(--mono);font-size:11px">arr[i] = undefined</code> konwertuje całą tablicę na OBJECT_ELEMENTS — wszystkie elementy przepakowywane, zużycie pamięci skacze 4×</div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">JAK V8 PRZECHOWUJE LICZBY W TYPEDARRAY</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.8;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>ArrayBuffer</strong> — surowy, ciągły blok bajtów bez żadnego tagowania ani nagłówków per-element; jeden obiekt na stercie niezależnie od rozmiaru</div>
+          <div><strong>Widok (view)</strong> — TypedArray to tylko metadane (pointer, offset, length); wiele widoków może nakładać się na ten sam bufor bez kopiowania danych</div>
+          <div><strong>Rozmiar deterministyczny</strong> — zawsze dokładnie tyle bajtów ile wynika z typu × liczba elementów; V8 nie może zmienić reprezentacji w trakcie działania</div>
+          <div><strong>GC</strong> — cały ArrayBuffer to jeden węzeł w grafie obiektów; GC skanuje go w O(1) niezależnie od tego ile elementów zawiera</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela typów -->
+    <div style="width:100%;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:8px;">
+      <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">ZUŻYCIE PAMIĘCI — 1 000 000 ELEMENTÓW</div>
+      <table class="mem-table">
+        <thead>
+          <tr>
+            <th>Typ</th>
+            <th>Zakres wartości</th>
+            <th class="num">B / element</th>
+            <th class="num">1 mln elementów</th>
+            <th class="num">oszczędność vs Array</th>
+            <th>Wizualizacja</th>
+            <th>Zastosowanie</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">Array</code> <span class="tag tag-red">OBJECT_ELEMENTS</span></td>
+            <td>dowolny typ JS</td>
+            <td class="num">~32</td>
+            <td class="num">~32 MB</td>
+            <td class="num" style="color:var(--red);">baza</td>
+            <td class="bar-cell"><div class="inline-bar" style="width:120px;background:var(--red);"></div></td>
+            <td style="font-size:11px;">mieszane dane, po push(null)</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">Array</code> <span class="tag tag-yellow">DOUBLE_ELEMENTS</span></td>
+            <td>tylko floaty / duże inty</td>
+            <td class="num">8</td>
+            <td class="num">~8 MB</td>
+            <td class="num" style="color:var(--green);">4× mniej</td>
+            <td class="bar-cell"><div class="inline-bar" style="width:30px;background:#d97706;"></div></td>
+            <td style="font-size:11px;">jednorodna tablica liczb, brak null</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">Float64Array</code></td>
+            <td>±5×10⁻³²⁴ … ±1.8×10³⁰⁸</td>
+            <td class="num">8</td>
+            <td class="num">8 MB</td>
+            <td class="num" style="color:var(--green);">4× mniej</td>
+            <td class="bar-cell"><div class="inline-bar" style="width:30px;background:var(--green);"></div></td>
+            <td style="font-size:11px;">fizyka, finanse, ML</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">Int32Array</code></td>
+            <td>−2 147 483 648 … 2 147 483 647</td>
+            <td class="num">4</td>
+            <td class="num">4 MB</td>
+            <td class="num" style="color:var(--green);">8× mniej</td>
+            <td class="bar-cell"><div class="inline-bar" style="width:15px;background:var(--green);"></div></td>
+            <td style="font-size:11px;">indeksy, współrzędne pikseli</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">Float32Array</code></td>
+            <td>±1.2×10⁻³⁸ … ±3.4×10³⁸ (~7 cyfr)</td>
+            <td class="num">4</td>
+            <td class="num">4 MB</td>
+            <td class="num" style="color:var(--green);">8× mniej</td>
+            <td class="bar-cell"><div class="inline-bar" style="width:15px;background:var(--green);"></div></td>
+            <td style="font-size:11px;">WebGL, audio, wektory ML</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">Uint16Array</code></td>
+            <td>0 … 65 535</td>
+            <td class="num">2</td>
+            <td class="num">2 MB</td>
+            <td class="num" style="color:var(--green);">16× mniej</td>
+            <td class="bar-cell"><div class="inline-bar" style="width:8px;background:var(--green);"></div></td>
+            <td style="font-size:11px;">indeksy mesh 3D, audio 16-bit</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">Uint8Array</code></td>
+            <td>0 … 255</td>
+            <td class="num">1</td>
+            <td class="num">1 MB</td>
+            <td class="num" style="color:var(--green);">32× mniej</td>
+            <td class="bar-cell"><div class="inline-bar" style="width:4px;background:var(--green);"></div></td>
+            <td style="font-size:11px;">RGBA piksele, dane binarne, WASM</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Przykład: subarray bez kopii -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="bench-panel">
+        <div class="bench-panel-header before">✗ &nbsp;Array.slice() — zawsze kopiuje dane</div>
+        <pre><code class="language-javascript">const big = new Array(1_000_000).fill(1.0);
+
+// slice tworzy nową tablicę i kopiuje elementy
+// O(n) czas i O(n) pamięć
+const chunk = big.slice(0, 10_000); // kopia!</code></pre>
+      </div>
+      <div class="bench-panel">
+        <div class="bench-panel-header after">✓ &nbsp;TypedArray.subarray() — widok bez kopii</div>
+        <pre><code class="language-javascript">const big = new Float64Array(1_000_000).fill(1.0);
+
+// subarray zwraca nowy widok na TEN SAM bufor
+// O(1) czas, zero dodatkowej pamięci
+const chunk = big.subarray(0, 10_000); // widok!
+// chunk i big dzielą ten sam ArrayBuffer</code></pre>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  initNav(15);
+  hljs.highlightAll();
+</script>
+</body>
+</html>

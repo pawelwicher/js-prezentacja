@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>14 — Deoptymalizacja funkcji | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <h2>Argumenty funkcji i deoptymalizacja</h2>
+
+    <!-- Teoria: mono / poly / mega -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:4px;">
+
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:#f0fdf4;color:#166534;font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">MONOMORPHIC — ideał</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>Definicja</strong> — funkcja zawsze wywoływana z argumentami tego samego typu i kształtu (hidden class)</div>
+          <div><strong>Co robi V8</strong> — Turbofan kompiluje wyspecjalizowany kod maszynowy zakładając konkretny typ; dostęp do pól to stały offset</div>
+          <div><strong>Inline cache</strong> — IC zapamiętuje jeden kształt; trafienie = brak lookupów</div>
+          <div><strong>Przykład</strong> — <code style="font-family:var(--mono);font-size:11px">add(1, 2)</code> zawsze z liczbami całkowitymi → V8 generuje instrukcję ADD bez sprawdzania typów</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:#fffbeb;color:#92400e;font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">POLYMORPHIC — wolniej</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>Definicja</strong> — funkcja widziana z 2–4 różnymi kształtami argumentów</div>
+          <div><strong>Co robi V8</strong> — IC trzyma małą tablicę kształtów i sprawdza każdy po kolei (linear search); nadal może być JIT-owany</div>
+          <div><strong>Koszt</strong> — kilka porównań kształtu przy każdym wywołaniu zamiast jednego trafienia</div>
+          <div><strong>Przykład</strong> — <code style="font-family:var(--mono);font-size:11px">process(obj)</code> gdzie obj ma raz <code style="font-family:var(--mono);font-size:11px">{x,y}</code>, raz <code style="font-family:var(--mono);font-size:11px">{x,y,z}</code></div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:#fef2f2;color:#991b1b;font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">MEGAMORPHIC — bailout</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>Definicja</strong> — ponad 4 różne kształty; IC się poddaje i przełącza w tryb globalny</div>
+          <div><strong>Co robi V8</strong> — każde wywołanie odpytuje globalny stub cache (hash lookup); brak specjalizacji, brak inline cache</div>
+          <div><strong>Deoptymalizacja</strong> — Turbofan może wycofać skompilowany kod i wrócić do interpretera (bailout), jeśli założenie o typie zostało złamane</div>
+          <div><strong>Przykład</strong> — generyczna funkcja <code style="font-family:var(--mono);font-size:11px">serialize(x)</code> wywoływana z dowolnym obiektem</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kod: mono vs mega -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;">
+      <div class="bench-panel">
+        <div class="bench-panel-header after">✓ &nbsp;Monomorphic — jeden kształt argumentu</div>
+        <pre><code class="language-javascript">// Zawsze ten sam kształt {x, y} → V8 specjalizuje
+function distanceMono(p) {
+  return Math.sqrt(p.x * p.x + p.y * p.y);
+}
+
+const points = Array.from({ length: N },
+  (_, i) => ({ x: i, y: i }) // jeden hidden class
+);
+points.forEach(p => distanceMono(p));</code></pre>
+      </div>
+      <div class="bench-panel">
+        <div class="bench-panel-header before">✗ &nbsp;Megamorphic — wiele różnych kształtów</div>
+        <pre><code class="language-javascript">// Każdy obiekt ma inny kształt → IC się poddaje
+function distanceMega(p) {
+  return Math.sqrt(p.x * p.x + p.y * p.y);
+}
+
+const shapes = [
+  { x: 1, y: 1 },           // kształt A
+  { y: 2, x: 2 },           // kształt B (inna kolejność!)
+  { x: 3, y: 3, z: 0 },     // kształt C
+  { x: 4, y: 4, label: '' },// kształt D
+  { r: 5, x: 5, y: 5 },     // kształt E → megamorphic
+];
+// cykl przez 5 kształtów → brak specjalizacji</code></pre>
+      </div>
+    </div>
+
+    <!-- Benchmark -->
+    <div style="width:100%;margin-bottom:4px;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;">BENCHMARK — ta sama logika, różne kształty argumentów</div>
+      <div class="bench-run-row" style="margin-bottom:10px;">
+        <button class="run-btn" id="run-btn-1" onclick="runBench()">▶ Uruchom benchmark</button>
+        <span class="run-hint" id="hint-1">500 000 wywołań, 20 powtórzeń pomiaru — średnia.</span>
+      </div>
+      <div id="results-1">
+        <div class="results-grid" style="grid-template-columns:repeat(4,1fr);">
+          <div class="result-card">
+            <div class="rc-label">Monomorphic</div>
+            <div class="rc-value good" id="r-mono">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Polymorphic (4)</div>
+            <div class="rc-value" id="r-poly" style="color:var(--text);">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Megamorphic (5+)</div>
+            <div class="rc-value bad" id="r-mega">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Spowolnienie</div>
+            <div class="rc-value highlight" id="r-speedup">—</div>
+            <div class="rc-sub">mega vs mono</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;width:100%;">
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:6px;">Monomorphic</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-mono" style="width:0%;background:var(--green)"></div></div>
+          </div>
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:#d97706;margin-bottom:6px;">Polymorphic</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-poly" style="width:0%;background:#d97706"></div></div>
+          </div>
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:6px;">Megamorphic</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-mega" style="width:0%;background:var(--red)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reguła kciuka -->
+    <div style="width:100%;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+      <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">REGUŁA KCIUKA</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 14px;gap:10px;font-size:12px;line-height:1.6;color:var(--text);">
+        <div><strong style="color:var(--green);">Trzymaj jeden kształt</strong><br/>Twórz obiekty zawsze w tej samej kolejności pól. <code style="font-family:var(--mono);font-size:11px">{x,y}</code> i <code style="font-family:var(--mono);font-size:11px">{y,x}</code> to dwa różne hidden classes dla V8.</div>
+        <div><strong style="color:var(--green);">Nie mieszaj typów</strong><br/>Funkcja wywoływana raz z liczbą, raz z null, raz z obiektem straci specjalizację. Dodaj guard na wejściu lub rozdziel na osobne funkcje.</div>
+        <div><strong style="color:var(--red);">Unikaj delete</strong><br/><code style="font-family:var(--mono);font-size:11px">delete obj.prop</code> zmienia hidden class obiektu → wszystkie funkcje używające tego kształtu muszą się zdeoptymalizować.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  initNav(14);
+  hljs.highlightAll();
+
+  function fmtSpeedup(a, b) {
+    if (b < 0.001) return '> ×1000';
+    const s = a / b;
+    return s >= 1000 ? '×' + (s / 1000).toFixed(1) + 'k' : '×' + s.toFixed(1);
+  }
+
+  function setBars(ids, times) {
+    const max = Math.max(...times);
+    ids.forEach((id, i) => {
+      document.getElementById(id).style.width = (times[i] / max * 100).toFixed(1) + '%';
+    });
+  }
+
+  async function runBench() {
+    const btn  = document.getElementById('run-btn-1');
+    const hint = document.getElementById('hint-1');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    hint.textContent = '';
+
+    await new Promise(r => setTimeout(r, 60));
+
+    const N      = 500_000;
+    const ITER   = 20;
+    const WARMUP = 3;
+
+    // Monomorphic — wszystkie punkty tego samego kształtu
+    const monoPoints = Array.from({ length: N }, (_, i) => ({ x: i * 0.1, y: i * 0.2 }));
+
+    // Polymorphic — 4 kształty w cyklu
+    const polyPoints = Array.from({ length: N }, (_, i) => {
+      switch (i % 4) {
+        case 0: return { x: i * 0.1, y: i * 0.2 };
+        case 1: return { x: i * 0.1, y: i * 0.2, _tag: 1 };
+        case 2: return { x: i * 0.1, y: i * 0.2, _tag: 2 };
+        default:return { x: i * 0.1, y: i * 0.2, _tag: 3 };
+      }
+    });
+
+    // Megamorphic — 6 kształtów w cyklu
+    const megaPoints = Array.from({ length: N }, (_, i) => {
+      switch (i % 6) {
+        case 0: return { x: i * 0.1, y: i * 0.2 };
+        case 1: return { y: i * 0.2, x: i * 0.1 };              // inna kolejność pól!
+        case 2: return { x: i * 0.1, y: i * 0.2, z: 0 };
+        case 3: return { x: i * 0.1, y: i * 0.2, label: '' };
+        case 4: return { r: 0, x: i * 0.1, y: i * 0.2 };
+        default:return { x: i * 0.1, y: i * 0.2, extra: true };
+      }
+    });
+
+    function distance(p) {
+      return Math.sqrt(p.x * p.x + p.y * p.y);
+    }
+
+    function runOver(points) {
+      let sum = 0;
+      for (let i = 0; i < points.length; i++) sum += distance(points[i]);
+      return sum;
+    }
+
+    // Warmup każdego osobno żeby nie mieszać kształtów w IC
+    for (let i = 0; i < WARMUP; i++) runOver(monoPoints);
+    const t0 = performance.now();
+    for (let i = 0; i < ITER; i++) runOver(monoPoints);
+    const tMono = (performance.now() - t0) / ITER;
+
+    await new Promise(r => setTimeout(r, 40));
+
+    // Nowa funkcja dla poly żeby IC zaczynał od zera
+    function distancePoly(p) { return Math.sqrt(p.x * p.x + p.y * p.y); }
+    function runPoly(points) { let s = 0; for (let i = 0; i < points.length; i++) s += distancePoly(points[i]); return s; }
+
+    for (let i = 0; i < WARMUP; i++) runPoly(polyPoints);
+    const t1 = performance.now();
+    for (let i = 0; i < ITER; i++) runPoly(polyPoints);
+    const tPoly = (performance.now() - t1) / ITER;
+
+    await new Promise(r => setTimeout(r, 40));
+
+    function distanceMega(p) { return Math.sqrt(p.x * p.x + p.y * p.y); }
+    function runMega(points) { let s = 0; for (let i = 0; i < points.length; i++) s += distanceMega(points[i]); return s; }
+
+    for (let i = 0; i < WARMUP; i++) runMega(megaPoints);
+    const t2 = performance.now();
+    for (let i = 0; i < ITER; i++) runMega(megaPoints);
+    const tMega = (performance.now() - t2) / ITER;
+
+    const fmt = ms => ms.toFixed(1) + ' ms';
+    document.getElementById('r-mono').textContent    = fmt(tMono);
+    document.getElementById('r-poly').textContent    = fmt(tPoly);
+    document.getElementById('r-mega').textContent    = fmt(tMega);
+    document.getElementById('r-speedup').textContent = fmtSpeedup(tMega, tMono);
+    setBars(['b-mono', 'b-poly', 'b-mega'], [tMono, tPoly, tMega]);
+
+    document.getElementById('results-1').classList.add('visible');
+    btn.disabled = false;
+    btn.innerHTML = '↺ Uruchom ponownie';
+    hint.textContent = 'Wyniki mogą się różnić — V8 jest niedeterministyczny przy JIT.';
+  }
+</script>
+</body>
+</html>

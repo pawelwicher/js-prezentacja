@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>10 — Map vs Object | Optymalizacja JS — silnik V8</title>
+  <title>09 — Map vs Object | Techniki optymalizacyjne w JS</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <link rel="stylesheet" href="../style.css" />
@@ -56,9 +56,9 @@
 // delete niszczy hidden class obiektu →
 // V8 przełącza go w wolny "dictionary mode"
 for (let i = 0; i < N; i++) {
-  obj[N + i] = i;
-  delete obj[i];
-  sum += obj[i + 1] || 0;
+  obj['k' + (N + i)] = i;
+  delete obj['k' + i];
+  sum += obj['k' + (i + 1)] || 0;
 }</code></pre>
         </div>
         <div class="bench-panel">
@@ -67,9 +67,9 @@ for (let i = 0; i < N; i++) {
 // Map zawsze działa jako tablica hashowa —
 // set/delete/get są stabilnie O(1)
 for (let i = 0; i < N; i++) {
-  map.set(N + i, i);
-  map.delete(i);
-  sum += map.get(i + 1) || 0;
+  map.set('k' + (N + i), i);
+  map.delete('k' + i);
+  sum += map.get('k' + (i + 1)) || 0;
 }</code></pre>
         </div>
       </div>
@@ -206,16 +206,16 @@ for (const [, val] of map) {
 
     function benchObj() {
       const obj = Object.create(null);
-      for (let i = 0; i < N; i++) obj[i + 0.5] = i;
+      for (let i = 0; i < N; i++) obj['k' + i] = i;
       let sum = 0;
-      for (let i = 0; i < N; i++) { obj[N + i + 0.5] = i; delete obj[i + 0.5]; sum += obj[(i + 1) + 0.5] || 0; }
+      for (let i = 0; i < N; i++) { obj['k' + (N + i)] = i; delete obj['k' + i]; sum += obj['k' + (i + 1)] || 0; }
       return sum;
     }
     function benchMap() {
       const map = new Map();
-      for (let i = 0; i < N; i++) map.set(i + 0.5, i);
+      for (let i = 0; i < N; i++) map.set('k' + i, i);
       let sum = 0;
-      for (let i = 0; i < N; i++) { map.set(N + i + 0.5, i); map.delete(i + 0.5); sum += map.get((i + 1) + 0.5) || 0; }
+      for (let i = 0; i < N; i++) { map.set('k' + (N + i), i); map.delete('k' + i); sum += map.get('k' + (i + 1)) || 0; }
       return sum;
     }
 

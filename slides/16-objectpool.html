@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>16 — Object Pooling | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <h2>Object Pooling — reużywanie obiektów</h2>
+
+    <!-- Teoria -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;">
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">BEZ POOLINGU — ciągła alokacja i GC</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>Każda operacja</strong> — tworzy nowy obiekt na stercie; po użyciu staje się śmieciem</div>
+          <div><strong>Minor GC (Scavenge)</strong> — V8 uruchamia minor GC gdy young generation się zapełni (~1–8 MB); wstrzymuje wykonanie na 1–5 ms</div>
+          <div><strong>Major GC (Mark-Compact)</strong> — po wielu minor GC; pauza 10–100 ms widoczna jako jank w animacjach (poniżej 60 fps)</div>
+          <div><strong>Presja alokacji</strong> — im szybciej tworzysz obiekty, tym częstsze GC; w grach lub animacjach (60 fps = 16 ms/klatka) jedna pauza GC = utracona klatka</div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">Z POOLINGIEM — zero alokacji w hot path</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>Idea</strong> — z góry alokujesz pulę obiektów; zamiast <code style="font-family:var(--mono);font-size:11px">new</code> bierzesz obiekt z puli, resetujesz pola, używasz; po użyciu oddajesz do puli</div>
+          <div><strong>Zero alokacji w hot path</strong> — GC nie ma co zbierać; pauzy znikają lub drastycznie maleją</div>
+          <div><strong>Hidden class stabilna</strong> — wszystkie obiekty z puli mają ten sam kształt (tworzone w tym samym miejscu); IC zawsze monomorphic</div>
+          <div><strong>Kiedy warto</strong> — obiekty krótkotrwałe tworzone w pętlach (cząsteczki, eventy, wektory 2D/3D, żądania w kolejce)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kod -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;">
+      <div class="bench-panel">
+        <div class="bench-panel-header before">✗ &nbsp;Bez poolingu — new przy każdej cząsteczce</div>
+        <pre><code class="language-javascript">function updateParticles(count) {
+  const particles = [];
+  for (let i = 0; i < count; i++) {
+    // nowy obiekt na stercie przy każdym wywołaniu
+    particles.push({
+      x: Math.random() * 800,
+      y: Math.random() * 600,
+      vx: (Math.random() - 0.5) * 4,
+      vy: (Math.random() - 0.5) * 4,
+    });
+  }
+  // po zakończeniu klatki wszystkie obiekty
+  // stają się śmieciami → GC musi je zebrać
+  return particles;
+}</code></pre>
+      </div>
+      <div class="bench-panel">
+        <div class="bench-panel-header after">✓ &nbsp;Object pool — reużywanie, zero new w pętli</div>
+        <pre><code class="language-javascript">class ParticlePool {
+  constructor(size) {
+    // alokacja jednorazowo przy starcie
+    this._pool = Array.from({ length: size },
+      () => ({ x: 0, y: 0, vx: 0, vy: 0 }));
+    this._free = this._pool.length - 1;
+  }
+  acquire() {
+    return this._free >= 0
+      ? this._pool[this._free--] : { x:0,y:0,vx:0,vy:0 };
+  }
+  release(p) {
+    if (this._free < this._pool.length - 1)
+      this._pool[++this._free] = p;
+  }
+}
+const pool = new ParticlePool(10_000);
+// acquire() / release() — zero alokacji</code></pre>
+      </div>
+    </div>
+
+    <!-- Benchmark -->
+    <div style="width:100%;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;">BENCHMARK — symulacja 10 000 cząsteczek × 500 klatek</div>
+      <div class="bench-run-row" style="margin-bottom:10px;">
+        <button class="run-btn" id="run-btn-1" onclick="runBench()">▶ Uruchom benchmark</button>
+        <span class="run-hint" id="hint-1">10 000 obiektów, 500 iteracji acquire+update+release, 5 powtórzeń.</span>
+      </div>
+      <div id="results-1">
+        <div class="results-grid" style="grid-template-columns:repeat(4,1fr);">
+          <div class="result-card">
+            <div class="rc-label">Bez poolingu</div>
+            <div class="rc-value bad" id="r-nop">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Z poolingiem</div>
+            <div class="rc-value good" id="r-pool">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Przyspieszenie</div>
+            <div class="rc-value highlight" id="r-speedup">—</div>
+            <div class="rc-sub">pool szybszy o</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Alokacje</div>
+            <div class="rc-value highlight" id="r-alloc">—</div>
+            <div class="rc-sub">uniknięte przez pool</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;width:100%;">
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:6px;">Bez poolingu</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-nop" style="width:0%;background:var(--red)"></div></div>
+          </div>
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:6px;">Z poolingiem</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-pool" style="width:0%;background:var(--green)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  initNav(16);
+  hljs.highlightAll();
+
+  function fmtSpeedup(a, b) {
+    if (b < 0.001) return '> ×1000';
+    const s = a / b;
+    return s >= 1000 ? '×' + (s / 1000).toFixed(1) + 'k' : '×' + s.toFixed(1);
+  }
+
+  async function runBench() {
+    const btn  = document.getElementById('run-btn-1');
+    const hint = document.getElementById('hint-1');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    hint.textContent = '';
+
+    await new Promise(r => setTimeout(r, 60));
+
+    const N      = 10_000;   // cząsteczki na klatkę
+    const FRAMES = 500;      // klatek
+    const ITER   = 5;
+    const WARMUP = 2;
+
+    // --- BEZ POOLINGU ---
+    function runNoPool() {
+      let sum = 0;
+      for (let f = 0; f < FRAMES; f++) {
+        const particles = new Array(N);
+        for (let i = 0; i < N; i++) {
+          particles[i] = { x: i * 0.1, y: i * 0.2, vx: i * 0.01, vy: i * 0.02 };
+        }
+        for (let i = 0; i < N; i++) {
+          particles[i].x += particles[i].vx;
+          particles[i].y += particles[i].vy;
+          sum += particles[i].x + particles[i].y;
+        }
+        // obiekty porzucane → GC
+      }
+      return sum;
+    }
+
+    // --- Z POOLINGIEM ---
+    const _poolStore = Array.from({ length: N },
+      () => ({ x: 0, y: 0, vx: 0, vy: 0 }));
+    let _free = N - 1;
+
+    function acquire(ix) {
+      const p = _poolStore[_free >= 0 ? _free-- : 0];
+      p.x = ix * 0.1; p.y = ix * 0.2;
+      p.vx = ix * 0.01; p.vy = ix * 0.02;
+      return p;
+    }
+    function release() { if (_free < N - 1) _free++; }
+
+    function runPool() {
+      let sum = 0;
+      for (let f = 0; f < FRAMES; f++) {
+        _free = N - 1;
+        for (let i = 0; i < N; i++) {
+          const p = acquire(i);
+          p.x += p.vx;
+          p.y += p.vy;
+          sum += p.x + p.y;
+          release();
+        }
+      }
+      return sum;
+    }
+
+    for (let i = 0; i < WARMUP; i++) runNoPool();
+    const t0 = performance.now();
+    for (let i = 0; i < ITER; i++) runNoPool();
+    const tNop = (performance.now() - t0) / ITER;
+
+    await new Promise(r => setTimeout(r, 60));
+
+    for (let i = 0; i < WARMUP; i++) runPool();
+    const t1 = performance.now();
+    for (let i = 0; i < ITER; i++) runPool();
+    const tPool = (performance.now() - t1) / ITER;
+
+    const fmt = ms => ms.toFixed(1) + ' ms';
+    const avoided = (N * FRAMES).toLocaleString('pl-PL');
+
+    document.getElementById('r-nop').textContent     = fmt(tNop);
+    document.getElementById('r-pool').textContent    = fmt(tPool);
+    document.getElementById('r-speedup').textContent = fmtSpeedup(tNop, tPool);
+    document.getElementById('r-alloc').textContent   = avoided;
+
+    const max = Math.max(tNop, tPool);
+    document.getElementById('b-nop').style.width  = (tNop  / max * 100).toFixed(1) + '%';
+    document.getElementById('b-pool').style.width = (tPool / max * 100).toFixed(1) + '%';
+
+    document.getElementById('results-1').classList.add('visible');
+    btn.disabled = false;
+    btn.innerHTML = '↺ Uruchom ponownie';
+    hint.textContent = `Pool uniknął ${avoided} alokacji — mniej pracy dla GC, mniejsze pauzy.`;
+  }
+</script>
+</body>
+</html>
