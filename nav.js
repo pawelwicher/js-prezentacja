@@ -7,7 +7,10 @@ const SLIDES = [
   '05-liczby.html',
   '06-tablice.html',
   '07-przyklady.html',
-  '08-deduplikacja.html',
+  '08-setandarray.html',
+  '09-mapandobject.html',
+  '10-numberarrays.html',
+  '11-hiddenclasses.html',
 ];
 
 const TOTAL = SLIDES.length;

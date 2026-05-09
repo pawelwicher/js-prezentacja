@@ -84,7 +84,6 @@
   </div>
 
   <div id="slide">
-    <span class="slide-tag">01 — Wstęp</span>
     <h1>Co warto optymalizować?</h1>
 
     <div class="two-col">
@@ -153,13 +152,34 @@
 
     </div>
 
+    <div style="width:100%;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+      <div style="background:var(--accent-light);color:var(--accent);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:10px 18px;border-bottom:1px solid var(--border);">
+        Twierdzenie Knutha
+      </div>
+      <div style="padding:14px 18px;display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:15px;font-style:italic;color:var(--text);line-height:1.5;">
+          „Premature optimization is the root of all evil."
+          <span style="font-style:normal;font-size:13px;color:var(--muted);margin-left:6px;">— Donald Knuth, 1974</span>
+        </div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.6;">
+          Pełny cytat: <em>„We should forget about small efficiencies, say about 97% of the time: premature optimization is the root of all evil. Yet we should not pass up our opportunities in that critical 3%."</em>
+        </div>
+        <div style="font-size:13px;color:var(--accent);line-height:1.6;background:var(--accent-light);border:1px solid #bfdbfe;border-radius:var(--radius);padding:10px 14px;">
+          Reguła trzyma się mocno: <strong>zoptymalizuj algorytm i strukturę danych najpierw</strong> (O-notacja, lokalność cache, alokacje),
+          a mikro-optymalizacje JIT-a stosuj tylko w zmierzonych hot pathach.
+          Większość kodu aplikacyjnego nigdy nie powinna ich potrzebować —
+          i odwrotnie, w silnikach gier, parserach, runtime'ach czy bibliotekach numerycznych
+          mogą stanowić różnicę między działaniem a niedziałaniem.
+        </div>
+      </div>
+    </div>
+
     <div class="tip-bar">
       <span class="tip-icon">📏</span>
       <span class="tip-text">
         <strong>Zanim zaczniesz optymalizować — zmierz.</strong>
         DevTools Performance i Memory tab pokazują gdzie naprawdę leży problem.
-        Intuicja często zawodzi. Premature optimization to klasyczna pułapka —
-        czytelność kodu jest zwykle ważniejsza niż mikrooptymalizacje, chyba że profiler mówi inaczej.
+        Intuicja często zawodzi — profiler nie kłamie.
       </span>
     </div>
 

@@ -129,6 +129,8 @@
       border-radius: var(--radius);
       overflow: hidden;
       background: var(--surface);
+      display: flex;
+      flex-direction: column;
     }
     .leak-card-header {
       padding: 8px 14px;
@@ -143,6 +145,8 @@
       font-size: 12.5px;
       color: var(--muted);
       line-height: 1.55;
+      background: #f8f9fa;
+      border-bottom: 1px solid var(--border);
     }
     .leak-card-body code {
       font-family: var(--mono);
@@ -157,7 +161,22 @@
       color: var(--green);
       background: var(--green-light);
       border-top: 1px solid #bbf7d0;
+      margin-top: auto;
     }
+    .leak-code {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 8px 10px;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      line-height: 1.5;
+      color: #374151;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .leak-code .bad { color: #dc2626; }
+    .leak-code .good { color: #16a34a; }
+    .leak-code .cmt { color: #9ca3af; }
 
     /* ── gen GC diagram ── */
     .gen-diagram {
@@ -194,7 +213,6 @@
   </div>
 
   <div id="slide">
-    <span class="slide-tag">02 — Zarządzanie pamięcią</span>
     <h1>Zarządzanie pamięcią w JS</h1>
 
     <div class="mem-tabs">
@@ -454,6 +472,12 @@ console.log(obj.x);  // 99 — oba wskazują to samo miejsce w pamięci</code></
           <div class="leak-card-body">
             Brak <code>let/const/var</code> tworzy zmienną globalną żyjącą przez cały czas aplikacji.
           </div>
+          <div class="leak-code"><span class="bad">function load() {
+  data = fetchAll(); <span class="cmt">// brak let → window.data</span>
+}</span>
+<span class="good">function load() {
+  const data = fetchAll(); <span class="cmt">// lokalna</span>
+}</span></div>
           <div class="leak-fix">✓ Zawsze <code>'use strict'</code> lub moduły ES</div>
         </div>
         <div class="leak-card">
@@ -461,6 +485,13 @@ console.log(obj.x);  // 99 — oba wskazują to samo miejsce w pamięci</code></
           <div class="leak-card-body">
             <code>setInterval</code> trzyma referencję do callbacka, a callback do wszystkiego, co domyka.
           </div>
+          <div class="leak-code"><span class="bad">setInterval(() => {
+  el.textContent = getData();
+}, 1000); <span class="cmt">// nigdy nie jest czyszczony</span></span>
+<span class="good">const id = setInterval(() => {
+  el.textContent = getData();
+}, 1000);
+onDestroy(() => clearInterval(id));</span></div>
           <div class="leak-fix">✓ Zapisuj ID, wołaj <code>clearInterval(id)</code> przy cleanup</div>
         </div>
         <div class="leak-card">
@@ -468,6 +499,14 @@ console.log(obj.x);  // 99 — oba wskazują to samo miejsce w pamięci</code></
           <div class="leak-card-body">
             Listener i jego domknięcie (np. <code>heavyContext</code>) zostają w pamięci po usunięciu elementu.
           </div>
+          <div class="leak-code"><span class="bad">const big = new Array(1e6).fill(0);
+btn.addEventListener('click', () => {
+  use(big); <span class="cmt">// big żyje tak długo jak btn</span>
+});</span>
+<span class="good">const ac = new AbortController();
+btn.addEventListener('click', handler,
+  { signal: ac.signal });
+onDestroy(() => ac.abort());</span></div>
           <div class="leak-fix">✓ <code>AbortController</code> lub <code>removeEventListener</code></div>
         </div>
         <div class="leak-card">
@@ -476,6 +515,16 @@ console.log(obj.x);  // 99 — oba wskazują to samo miejsce w pamięci</code></
             Element usunięty z DOM, ale wciąż trzymany przez zmienną JS lub cache.
             Widoczny w DevTools jako "Detached HTMLElement".
           </div>
+          <div class="leak-code"><span class="bad">const rows = [];
+function addRow() {
+  const tr = table.insertRow();
+  rows.push(tr); <span class="cmt">// rows trzyma usunięte</span>
+  table.remove();
+}</span>
+<span class="good">let rowRef = null;
+rowRef = table.insertRow();
+table.remove();
+rowRef = null; <span class="cmt">// GC może zebrać</span></span></div>
           <div class="leak-fix">✓ Nulluj referencje po usunięciu z DOM</div>
         </div>
         <div class="leak-card">
@@ -483,6 +532,19 @@ console.log(obj.x);  // 99 — oba wskazują to samo miejsce w pamięci</code></
           <div class="leak-card-body">
             Nieskończenie rosnący <code>cache = {}</code> lub <code>Map</code> z setkami tysięcy wpisów.
           </div>
+          <div class="leak-code"><span class="bad">const cache = new Map();
+function get(key) {
+  if (!cache.has(key))
+    cache.set(key, compute(key));
+  return cache.get(key); <span class="cmt">// rośnie bez końca</span>
+}</span>
+<span class="good">const cache = new WeakMap();
+<span class="cmt">// klucz-obiekt → GC może zebrać wpis</span>
+function get(obj) {
+  if (!cache.has(obj))
+    cache.set(obj, compute(obj));
+  return cache.get(obj);
+}</span></div>
           <div class="leak-fix">✓ LRU cache lub <code>WeakMap</code> (klucze mogą być GC-owane)</div>
         </div>
         <div class="leak-card">
@@ -490,6 +552,19 @@ console.log(obj.x);  // 99 — oba wskazują to samo miejsce w pamięci</code></
           <div class="leak-card-body">
             Domknięcie używa tylko <code>small</code>, ale gdy jest <code>eval</code> / <code>with</code> — całe scope zostaje.
           </div>
+          <div class="leak-code"><span class="bad">function outer() {
+  const big = new Array(1e6);
+  const small = 42;
+  return () => {
+    eval(''); <span class="cmt">// zatrzymuje całe scope</span>
+    return small;
+  };
+}</span>
+<span class="good">function outer() {
+  const big = new Array(1e6);
+  const small = 42;
+  return () => small; <span class="cmt">// big może być GC</span>
+}</span></div>
           <div class="leak-fix">✓ Przekazuj tylko to, co potrzebne; unikaj <code>eval</code></div>
         </div>
       </div>

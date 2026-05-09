@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>10 — Map vs Object | Optymalizacja JS — silnik V8</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <h2>Map vs Object</h2>
+
+    <!-- Charakterystyka -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;">
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">OBJECT — zoptymalizowany pod stałą strukturę</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>Hidden class</strong> — V8 buduje ukryty schemat obiektu; dostęp do pola to stały offset w pamięci (jak struct w C)</div>
+          <div><strong>Inline cache</strong> — kompilator zapamiętuje offset klucza; kolejne odczyty pomijają lookup całkowicie</div>
+          <div><strong>Dictionary mode</strong> — po <code style="font-family:var(--mono);font-size:11px">delete</code> lub zbyt wielu zmianach V8 porzuca hidden class i przechodzi na hash mapę — wolniej, bez IC</div>
+          <div><strong>Klucze</strong> — tylko stringi i symbole; <code style="font-family:var(--mono);font-size:11px">obj[{}]</code> → <code style="font-family:var(--mono);font-size:11px">"[object Object]"</code></div>
+          <div><strong>Rozmiar</strong> — <code style="font-family:var(--mono);font-size:11px">Object.keys(o).length</code> — O(n)</div>
+          <div><strong>Pamięć</strong> — kompaktowy w fast mode; shape współdzielony między obiektami tej samej "klasy"</div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">MAP — zaprojektowany jako słownik od początku</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>OrderedHashTable</strong> — zawsze hash mapa z listą zachowującą kolejność wstawiania; nigdy nie ma "fast mode" obiektowego</div>
+          <div><strong>Stabilne O(1)</strong> — set / get / delete / has zawsze przewidywalne, bez skoków wydajności przy <code style="font-family:var(--mono);font-size:11px">delete</code></div>
+          <div><strong>Klucze dowolnego typu</strong> — obiekty, liczby, <code style="font-family:var(--mono);font-size:11px">NaN</code>; porównanie przez SameValueZero (jak <code style="font-family:var(--mono);font-size:11px">===</code>, ale NaN === NaN)</div>
+          <div><strong>Kolejność wstawiania</strong> — <code style="font-family:var(--mono);font-size:11px">[...m.keys()]</code> zawsze w kolejności <code style="font-family:var(--mono);font-size:11px">set()</code>, bez niespodzianek z kluczami numerycznymi</div>
+          <div><strong>Rozmiar</strong> — <code style="font-family:var(--mono);font-size:11px">map.size</code> — O(1), licznik trzymany jako pole</div>
+          <div><strong>Pamięć</strong> — narzut hash tabeli (bucket array, łańcuchy kolizji); dla małych kolekcji Object używa mniej pamięci</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benchmark 1: dynamic set/delete/get -->
+    <div style="width:100%;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;">BENCHMARK 1 — Częste dodawanie i usuwanie kluczy (rotacja)</div>
+      <div class="bench-layout">
+        <div class="bench-panel">
+          <div class="bench-panel-header before">✗ &nbsp;Object — delete degraduje do dictionary mode</div>
+          <pre><code class="language-javascript">// Rotacja 20 000 wpisów: dodaj nowy, usuń stary
+// delete niszczy hidden class obiektu →
+// V8 przełącza go w wolny "dictionary mode"
+for (let i = 0; i < N; i++) {
+  obj[N + i] = i;
+  delete obj[i];
+  sum += obj[i + 1] || 0;
+}</code></pre>
+        </div>
+        <div class="bench-panel">
+          <div class="bench-panel-header after">✓ &nbsp;Map — zaprojektowany do częstych modyfikacji</div>
+          <pre><code class="language-javascript">// Rotacja 20 000 wpisów: dodaj nowy, usuń stary
+// Map zawsze działa jako tablica hashowa —
+// set/delete/get są stabilnie O(1)
+for (let i = 0; i < N; i++) {
+  map.set(N + i, i);
+  map.delete(i);
+  sum += map.get(i + 1) || 0;
+}</code></pre>
+        </div>
+      </div>
+      <div class="bench-run-row" style="margin-top:8px;margin-bottom:12px;">
+        <button class="run-btn" id="run-btn-1" onclick="runBench1()">▶ Uruchom benchmark 1</button>
+        <span class="run-hint" id="hint-1">20 000 operacji set+delete+get, 300 powtórzeń.</span>
+      </div>
+      <div id="results-1">
+        <div class="results-grid">
+          <div class="result-card">
+            <div class="rc-label">Object</div>
+            <div class="rc-value bad" id="r1-obj">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Map</div>
+            <div class="rc-value good" id="r1-map">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Przyspieszenie</div>
+            <div class="rc-value highlight" id="r1-speedup">—</div>
+            <div class="rc-sub">Map jest szybszy o</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;width:100%;">
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:6px;">Object</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b1-obj" style="width:0%;background:var(--red)"></div></div>
+          </div>
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:6px;">Map</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b1-map" style="width:0%;background:var(--green)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benchmark 2: iteration -->
+    <div style="width:100%;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;">BENCHMARK 2 — Iteracja po kluczach</div>
+      <div class="bench-layout">
+        <div class="bench-panel">
+          <div class="bench-panel-header before">✗ &nbsp;Object — Object.keys() + pętla</div>
+          <pre><code class="language-javascript">// Iteracja po 50 000 kluczach obiektu
+let sum = 0;
+const keys = Object.keys(obj);
+for (let i = 0; i < keys.length; i++) {
+  sum += obj[keys[i]];
+}</code></pre>
+        </div>
+        <div class="bench-panel">
+          <div class="bench-panel-header after">✓ &nbsp;Map — for...of &nbsp;natywna iteracja</div>
+          <pre><code class="language-javascript">// Iteracja po 50 000 wpisach Map
+let sum = 0;
+for (const [, val] of map) {
+  sum += val;
+}</code></pre>
+        </div>
+      </div>
+      <div class="bench-run-row" style="margin-top:8px;margin-bottom:12px;">
+        <button class="run-btn" id="run-btn-2" onclick="runBench2()">▶ Uruchom benchmark 2</button>
+        <span class="run-hint" id="hint-2">50 000 kluczy, 500 powtórzeń.</span>
+      </div>
+      <div id="results-2">
+        <div class="results-grid">
+          <div class="result-card">
+            <div class="rc-label">Object.keys + pętla</div>
+            <div class="rc-value bad" id="r2-obj">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Map for...of</div>
+            <div class="rc-value good" id="r2-map">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Przyspieszenie</div>
+            <div class="rc-value highlight" id="r2-speedup">—</div>
+            <div class="rc-sub">Map jest szybszy o</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;width:100%;">
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:6px;">Object.keys + pętla</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b2-obj" style="width:0%;background:var(--red)"></div></div>
+          </div>
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:6px;">Map for...of</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b2-map" style="width:0%;background:var(--green)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  initNav(9);
+  hljs.highlightAll();
+
+  function fmtSpeedup(a, b) {
+    if (b < 0.001) return '> ×1000';
+    const s = a / b;
+    return s >= 1000 ? '×' + (s / 1000).toFixed(1) + 'k' : '×' + s.toFixed(0);
+  }
+
+  function setBars(idA, idB, tA, tB) {
+    const slower = Math.max(tA, tB);
+    document.getElementById(idA).style.width = (tA / slower * 100).toFixed(1) + '%';
+    document.getElementById(idB).style.width = (tB / slower * 100).toFixed(1) + '%';
+  }
+
+  async function runBench1() {
+    const btn  = document.getElementById('run-btn-1');
+    const hint = document.getElementById('hint-1');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    hint.textContent = '';
+
+    await new Promise(r => setTimeout(r, 60));
+
+    const N      = 20_000;
+    const ITER   = 300;
+    const WARMUP = 30;
+
+    function benchObj() {
+      const obj = Object.create(null);
+      for (let i = 0; i < N; i++) obj[i + 0.5] = i;
+      let sum = 0;
+      for (let i = 0; i < N; i++) { obj[N + i + 0.5] = i; delete obj[i + 0.5]; sum += obj[(i + 1) + 0.5] || 0; }
+      return sum;
+    }
+    function benchMap() {
+      const map = new Map();
+      for (let i = 0; i < N; i++) map.set(i + 0.5, i);
+      let sum = 0;
+      for (let i = 0; i < N; i++) { map.set(N + i + 0.5, i); map.delete(i + 0.5); sum += map.get((i + 1) + 0.5) || 0; }
+      return sum;
+    }
+
+    for (let i = 0; i < WARMUP; i++) benchObj();
+    const t0 = performance.now();
+    for (let i = 0; i < ITER; i++) benchObj();
+    const tObj = (performance.now() - t0) / ITER;
+
+    await new Promise(r => setTimeout(r, 40));
+
+    for (let i = 0; i < WARMUP; i++) benchMap();
+    const t1 = performance.now();
+    for (let i = 0; i < ITER; i++) benchMap();
+    const tMap = (performance.now() - t1) / ITER;
+
+    const fmt = ms => ms.toFixed(2) + ' ms';
+    document.getElementById('r1-obj').textContent     = fmt(tObj);
+    document.getElementById('r1-map').textContent     = fmt(tMap);
+    document.getElementById('r1-speedup').textContent = fmtSpeedup(tObj, tMap);
+    setBars('b1-obj', 'b1-map', tObj, tMap);
+
+    document.getElementById('results-1').classList.add('visible');
+    btn.disabled = false;
+    btn.innerHTML = '↺ Uruchom ponownie';
+    hint.textContent = 'Wyniki mogą się nieznacznie różnić między uruchomieniami.';
+  }
+
+  async function runBench2() {
+    const btn  = document.getElementById('run-btn-2');
+    const hint = document.getElementById('hint-2');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    hint.textContent = '';
+
+    await new Promise(r => setTimeout(r, 60));
+
+    const N      = 50_000;
+    const ITER   = 500;
+    const WARMUP = 20;
+
+    const obj = {};
+    const map = new Map();
+    for (let i = 0; i < N; i++) { obj[`key_${i}`] = i; map.set(`key_${i}`, i); }
+
+    function benchObj() {
+      let sum = 0;
+      const keys = Object.keys(obj);
+      for (let i = 0; i < keys.length; i++) sum += obj[keys[i]];
+      return sum;
+    }
+    function benchMap() {
+      let sum = 0;
+      for (const [, val] of map) sum += val;
+      return sum;
+    }
+
+    for (let i = 0; i < WARMUP; i++) benchObj();
+    const t0 = performance.now();
+    for (let i = 0; i < ITER; i++) benchObj();
+    const tObj = (performance.now() - t0) / ITER;
+
+    await new Promise(r => setTimeout(r, 40));
+
+    for (let i = 0; i < WARMUP; i++) benchMap();
+    const t1 = performance.now();
+    for (let i = 0; i < ITER; i++) benchMap();
+    const tMap = (performance.now() - t1) / ITER;
+
+    const fmt = ms => ms.toFixed(3) + ' ms';
+    document.getElementById('r2-obj').textContent     = fmt(tObj);
+    document.getElementById('r2-map').textContent     = fmt(tMap);
+    document.getElementById('r2-speedup').textContent = fmtSpeedup(tObj, tMap);
+    setBars('b2-obj', 'b2-map', tObj, tMap);
+
+    document.getElementById('results-2').classList.add('visible');
+    btn.disabled = false;
+    btn.innerHTML = '↺ Uruchom ponownie';
+    hint.textContent = 'Wyniki mogą się nieznacznie różnić między uruchomieniami.';
+  }
+</script>
+</body>
+</html>

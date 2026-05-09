@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>11 — Typy tablic w V8 | Optymalizacja JS — silnik V8</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    .ek-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .ek-table th {
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .ek-table th.num { text-align: right; }
+    .ek-table td {
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: top;
+    }
+    .ek-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12px; }
+    .ek-table tr:last-child td { border-bottom: none; }
+    .ek-table tr:hover td { background: #f9fafb; }
+    .ek-kind { font-weight: 700; font-family: var(--mono); font-size: 12px; }
+    .ek-desc { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+    .ek-example { font-size: 11px; color: #94a3b8; font-family: var(--mono); margin-top: 1px; }
+    .ek-bar-wrap { width: 80px; height: 6px; background: var(--border); border-radius: 999px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
+    .ek-bar-fill { height: 100%; border-radius: 999px; transition: width 500ms cubic-bezier(.4,0,.2,1); }
+    .val-best   { color: var(--green); font-weight: 700; }
+    .val-slow   { color: var(--red); }
+    .val-normal { color: var(--text); }
+    #ek-results { display: none; width: 100%; }
+    #ek-results.visible { display: block; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide" style="min-height:0;">
+    <h2>SMI / HeapNumber &amp; Packed / Holey arrays</h2>
+
+    <!-- Charakterystyka -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">TYPY ELEMENTÓW — co V8 trzyma w środku</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>SMI</strong> (Small Integer) — liczby całkowite 31-bit; przechowywane bezpośrednio jako wartość, bez alokacji na stercie. Najszybszy typ.</div>
+          <div><strong>DOUBLE</strong> (HeapNumber) — liczby zmiennoprzecinkowe; każda wartość to osobny obiekt na stercie — dodatkowy koszt dostępu i GC</div>
+          <div><strong>Degradacja jest jednostronna</strong> — jeden <code style="font-family:var(--mono);font-size:11px">push(0.5)</code> na tablicy SMI przepisuje ją do DOUBLE. V8 nigdy nie cofa degradacji.</div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">PACKED vs HOLEY — czy są dziury?</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>Packed</strong> — tablica bez dziur; V8 zakłada że każdy indeks ma wartość i generuje szybki, uproszczony kod maszynowy</div>
+          <div><strong>Holey</strong> — tablica z lukami (<code style="font-family:var(--mono);font-size:11px">new Array(N)</code>, <code style="font-family:var(--mono);font-size:11px">delete arr[i]</code>); przy każdym dostępie V8 sprawdza czy slot istnieje i szuka w prototypie</div>
+          <div><strong>Dictionary</strong> — bardzo rzadka tablica (duże skoki indeksów); V8 rezygnuje z bufora i używa hash mapy</div>
+          <div><strong>Unikaj:</strong> <code style="font-family:var(--mono);font-size:11px">new Array(N)</code> → użyj <code style="font-family:var(--mono);font-size:11px">Array.from</code>; <code style="font-family:var(--mono);font-size:11px">delete arr[i]</code> → użyj <code style="font-family:var(--mono);font-size:11px">splice</code></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skąd nazwy i jak sprawdzić -->
+    <div class="bench-layout">
+      <div class="bench-panel">
+        <div class="bench-panel-header" style="background:var(--surface);color:var(--muted);">SKĄD NAZWY — HIERARCHIA DEGRADACJI</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:5px;">
+          <div><strong>Nazwy pochodzą z kodu źródłowego V8</strong> — zdefiniowane w <code style="font-family:var(--mono);font-size:11px">src/objects/elements-kind.h</code>. Każda tablica ma wewnętrzne pole <code style="font-family:var(--mono);font-size:11px">ElementsKind</code> — enum z 21 wartościami.</div>
+          <div>Nazwa składa się z dwóch części: <strong>[packed|holey]</strong> określa czy są dziury, <strong>[smi|double|elements]</strong> określa typ wartości.</div>
+          <div><strong>Hierarchia degradacji</strong> — przejście jest zawsze w jedną stronę (w dół), nigdy w górę:</div>
+          <div style="font-family:var(--mono);font-size:11px;background:#f8fafc;border:1px solid var(--border);border-radius:4px;padding:8px 10px;line-height:1.8;">
+            PACKED_SMI_ELEMENTS<br>
+            &nbsp;&nbsp;↓ dodanie float (np. 0.5)<br>
+            PACKED_DOUBLE_ELEMENTS<br>
+            &nbsp;&nbsp;↓ dodanie obiektu / stringa<br>
+            PACKED_ELEMENTS<br>
+            &nbsp;&nbsp;↓ dziura (delete / new Array(N))<br>
+            HOLEY_SMI → HOLEY_DOUBLE → HOLEY_ELEMENTS
+          </div>
+        </div>
+      </div>
+      <div class="bench-panel">
+        <div class="bench-panel-header" style="background:var(--surface);color:var(--muted);">JAK ZOBACZYĆ W NODE.JS</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:5px;">
+          <div><strong>Flaga <code style="font-family:var(--mono);font-size:11px">--allow-natives-syntax</code></strong> udostępnia wewnętrzne funkcje V8 z prefiksem <code style="font-family:var(--mono);font-size:11px">%</code>:</div>
+          <div style="font-family:var(--mono);font-size:11px;background:#f8fafc;border:1px solid var(--border);border-radius:4px;padding:8px 10px;line-height:1.8;">
+            <span style="color:var(--muted)">// node --allow-natives-syntax script.js</span><br><br>
+            const a = [1, 2, 3];<br>
+            %DebugPrint(a);<br>
+            <span style="color:var(--muted)">// → elements kind: PACKED_SMI_ELEMENTS</span><br><br>
+            a.push(0.5);<br>
+            %DebugPrint(a);<br>
+            <span style="color:var(--muted)">// → elements kind: PACKED_DOUBLE_ELEMENTS</span><br><br>
+            delete a[0];<br>
+            %DebugPrint(a);<br>
+            <span style="color:var(--muted)">// → elements kind: HOLEY_DOUBLE_ELEMENTS</span>
+          </div>
+          <div style="color:var(--muted);">Flaga działa tylko w Node / standalone V8 — niedostępna w przeglądarce. Przydatna do debugowania hot paths.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benchmark -->
+    <div style="width:100%;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.04em;">BENCHMARK — odczyt (for loop), N = 100 000, 50 powtórzeń, średnia</div>
+      <div class="bench-layout" style="margin-bottom:10px;">
+        <div class="bench-panel">
+          <div class="bench-panel-header" style="background:var(--surface);color:var(--muted);">FABRYKA — jak tworzymy każdy wariant</div>
+          <pre><code class="language-javascript">// PACKED_SMI — push samych intów
+const a = [];
+for (let i = 0; i < N; i++) a.push(i);
+
+// HOLEY_SMI — dziury co 10 elementów
+const a = [];
+for (let i = 0; i < N; i++) {
+  if (i % 10 !== 0) a[i] = i;
+}
+
+// DICTIONARY — duże skoki indeksów
+const a = [];
+for (let i = 0; i < N; i++) a[i * 10] = i;</code></pre>
+        </div>
+        <div class="bench-panel">
+          <div class="bench-panel-header" style="background:var(--surface);color:var(--muted);">BENCHMARK — hot path odczytu</div>
+          <pre><code class="language-javascript">// Ta sama funkcja dla każdego wariantu —
+// iteracja for + sumowanie elementów
+function benchRead(array) {
+  let sum = 0;
+  const len = array.length;
+  for (let i = 0; i < len; i++) {
+    const v = array[i];
+    if (v !== undefined && v !== null)
+      sum += typeof v === 'object' ? v.v : v;
+  }
+  return sum;
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="bench-run-row" style="margin-bottom:12px;">
+        <button class="run-btn" id="run-btn" onclick="runBenchmark()">▶ Uruchom benchmark</button>
+        <span class="run-hint" id="run-hint">7 wariantów tablic — od PACKED_SMI do DICTIONARY.</span>
+      </div>
+
+      <div id="ek-results">
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <table class="ek-table">
+            <thead>
+              <tr>
+                <th style="width:36%">Rodzaj tablicy</th>
+                <th class="num" style="width:11%">Średnia (ms)</th>
+                <th class="num" style="width:9%">Min</th>
+                <th class="num" style="width:9%">Max</th>
+                <th style="width:35%">Względnie</th>
+              </tr>
+            </thead>
+            <tbody id="ek-tbody"></tbody>
+          </table>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px;align-self:flex-start;">
+          Wyniki zależą od przeglądarki i wersji V8.
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  'use strict';
+  initNav(10);
+  hljs.highlightAll();
+
+  const N    = 100_000;
+  const RUNS = 50;
+
+  const KIND_META = {
+    'PACKED_SMI':      { desc: 'Gęsta tablica małych liczb całkowitych (31-bit). Najszybszy możliwy layout.',         example: 'Array.from({length:N}, (_,i) => i)' },
+    'PACKED_DOUBLE':   { desc: 'Gęsta tablica liczb zmiennoprzecinkowych. Wartości unboxed.',                         example: 'Array.from({length:N}, (_,i) => i+0.1)' },
+    'PACKED_ELEMENTS': { desc: 'Gęsta tablica dowolnych obiektów JS. Każdy element to wskaźnik na heap.',             example: 'Array.from({length:N}, (_,i) => ({v:i}))' },
+    'HOLEY_SMI':       { desc: 'Ints z dziurami. V8 sprawdza prototype chain przy każdym odczycie dziury.',           example: 'const a=[]; for(i) if(i%10!==0) a[i]=i' },
+    'HOLEY_DOUBLE':    { desc: 'Floaty z dziurami. Dziury kodowane jako specjalny NaN.',                              example: 'const a=[]; for(i) if(i%10!==0) a[i]=i+0.1' },
+    'HOLEY_ELEMENTS':  { desc: 'Obiekty z dziurami. Najwolniejszy wariant tablic liniowych.',                        example: 'const a=[]; for(i) if(i%10!==0) a[i]={v:i}' },
+    'DICTIONARY':      { desc: 'Tryb słownikowy (HashMap). Aktywowany gdy tablica jest bardzo rzadka.',              example: 'const a=[]; for(i) a[i*10]=i  // duże skoki' },
+  };
+
+  function makePackedSmi()      { const a=[]; for(let i=0;i<N;i++) a.push(i);        return a; }
+  function makePackedDouble()   { const a=[]; for(let i=0;i<N;i++) a.push(i+0.1);    return a; }
+  function makePackedElements() { const a=[]; for(let i=0;i<N;i++) a.push({v:i});    return a; }
+  function makeHoleySmi()       { const a=[]; for(let i=0;i<N;i++) { if(i%10!==0) a[i]=i; } return a; }
+  function makeHoleyDouble()    { const a=[]; for(let i=0;i<N;i++) { if(i%10!==0) a[i]=i+0.1; } return a; }
+  function makeHoleyElements()  { const a=[]; for(let i=0;i<N;i++) { if(i%10!==0) a[i]={v:i}; } return a; }
+  function makeDictionary()     { const a=[]; for(let i=0;i<N;i++) a[i*10]=i; return a; }
+
+  function benchRead(array) {
+    let sum=0; const len=array.length;
+    for(let i=0;i<len;i++) { const v=array[i]; if(v!==undefined&&v!==null) sum+=typeof v==='object'?v.v:v; }
+    return sum;
+  }
+
+  function avg(times) {
+    return times.reduce((a,b)=>a+b,0)/times.length;
+  }
+
+  function runOne(label, factory) {
+    const times=[];
+    for(let r=0;r<RUNS;r++) {
+      const a=factory();
+      const t0=performance.now();
+      benchRead(a);
+      times.push(performance.now()-t0);
+    }
+    return { label, avg:avg(times), min:Math.min(...times), max:Math.max(...times) };
+  }
+
+  const CASES = [
+    { label:'PACKED_SMI',      factory:makePackedSmi },
+    { label:'PACKED_DOUBLE',   factory:makePackedDouble },
+    { label:'PACKED_ELEMENTS', factory:makePackedElements },
+    { label:'HOLEY_SMI',       factory:makeHoleySmi },
+    { label:'HOLEY_DOUBLE',    factory:makeHoleyDouble },
+    { label:'HOLEY_ELEMENTS',  factory:makeHoleyElements },
+    { label:'DICTIONARY',      factory:makeDictionary },
+  ];
+
+  async function runBenchmark() {
+    const btn  = document.getElementById('run-btn');
+    const hint = document.getElementById('run-hint');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    hint.textContent = '';
+
+    await new Promise(r => setTimeout(r, 60));
+
+    // warmup
+    for(const c of CASES) { const a=c.factory(); benchRead(a); benchRead(a); }
+
+    await new Promise(r => setTimeout(r, 40));
+
+    const results = CASES.map(c => runOne(c.label, c.factory));
+    results.sort((a,b) => a.avg - b.avg);
+
+    const best  = results[0].avg;
+    const worst = results[results.length-1].avg;
+
+    const tbody = document.getElementById('ek-tbody');
+    tbody.innerHTML = '';
+
+    for(const r of results) {
+      const ratio    = r.avg / best;
+      const ratioStr = ratio.toFixed(2) + 'x';
+      const barPct   = (r.avg / worst * 100).toFixed(1);
+      const isBest   = r.avg === best;
+      const isSlow   = ratio >= 2;
+      const valCls   = isBest ? 'val-best' : isSlow ? 'val-slow' : 'val-normal';
+      const barColor = isBest ? 'var(--green)' : isSlow ? 'var(--red)' : 'var(--accent)';
+      const meta     = KIND_META[r.label] || {};
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <div class="ek-kind">${r.label}</div>
+          ${meta.desc    ? `<div class="ek-desc">${meta.desc}</div>` : ''}
+          ${meta.example ? `<div class="ek-example">${meta.example}</div>` : ''}
+        </td>
+        <td class="num ${valCls}">${r.avg.toFixed(3)}</td>
+        <td class="num">${r.min.toFixed(3)}</td>
+        <td class="num">${r.max.toFixed(3)}</td>
+        <td>
+          <span class="${valCls}" style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;">${ratioStr}</span>
+          <span class="ek-bar-wrap"><span class="ek-bar-fill" style="width:${barPct}%;background:${barColor}"></span></span>
+        </td>`;
+      tbody.appendChild(tr);
+    }
+
+    document.getElementById('ek-results').classList.add('visible');
+    btn.disabled = false;
+    btn.innerHTML = '↺ Uruchom ponownie';
+    hint.textContent = 'Wyniki mogą się nieznacznie różnić między uruchomieniami.';
+  }
+</script>
+</body>
+</html>
