@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>21 — Web Workers + Transferables | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    .worker-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+    .worker-card { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .worker-card-header { padding: 8px 14px; font-size: 12px; font-weight: 700; letter-spacing: .03em; border-bottom: 1px solid var(--border); }
+    .worker-card-body { padding: 10px 14px; font-size: 12px; line-height: 1.7; color: var(--text); display: flex; flex-direction: column; gap: 4px; }
+
+    .transfer-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .transfer-table th { background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 7px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+    .transfer-table td { padding: 6px 12px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
+    .transfer-table tr:last-child td { border-bottom: none; }
+    .transfer-table tr:hover td { background: #f9fafb; }
+    .tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
+    .tag-green { background: #dcfce7; color: #166534; }
+    .tag-red { background: #fee2e2; color: #991b1b; }
+    .tag-yellow { background: #fef9c3; color: #854d0e; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <h2>Web Workers — wielowątkowość i transferables</h2>
+
+    <!-- 3 karty teorii -->
+    <div class="worker-grid">
+      <div class="worker-card">
+        <div class="worker-card-header" style="background:var(--surface);color:var(--muted);">IZOLACJA STERTY</div>
+        <div class="worker-card-body">
+          <div>Każdy Worker ma <strong>własną, odizolowaną stertę V8</strong>. Nie współdzielą pamięci z wątkiem głównym — brak wyścigów danych, brak blokad.</div>
+          <div>GC każdego workera działa niezależnie. Alokacje w workerze nie powodują pauz GC w wątku głównym i odwrotnie.</div>
+          <div><strong>Konsekwencja:</strong> wyciągnięcie ciężkich obliczeń do workera odciąża główny wątek i eliminuje jank w animacjach i UI.</div>
+        </div>
+      </div>
+      <div class="worker-card">
+        <div class="worker-card-header" style="background:var(--surface);color:var(--muted);">KOMUNIKACJA — postMessage</div>
+        <div class="worker-card-body">
+          <div><strong>Domyślnie: kopiowanie strukturalne</strong> — <code style="font-size:11px">postMessage(data)</code> serializuje dane algorytmem structured clone i kopiuje je do drugiej sterty. Koszt = O(rozmiar danych).</div>
+          <div>Structured clone obsługuje: <code style="font-size:11px">Date</code>, <code style="font-size:11px">Map</code>, <code style="font-size:11px">Set</code>, <code style="font-size:11px">ArrayBuffer</code>, <code style="font-size:11px">Blob</code>, cykliczne referencje. Nie obsługuje: funkcji, DOM, klas z metodami.</div>
+          <div><strong>Alternatywa zero-copy:</strong> transferables — patrz niżej.</div>
+        </div>
+      </div>
+      <div class="worker-card">
+        <div class="worker-card-header" style="background:var(--surface);color:var(--muted);">KIEDY UŻYWAĆ WORKERÓW</div>
+        <div class="worker-card-body">
+          <div><strong style="color:var(--green);">✓ Dobre przypadki:</strong> parsowanie dużych plików JSON/CSV, kompresja, szyfrowanie, obliczenia numeryczne, generowanie obrazów, przetwarzanie audio.</div>
+          <div><strong style="color:var(--red);">✗ Złe przypadki:</strong> zadania wymagające dostępu do DOM (worker nie ma dostępu), krótkie operacje (overhead tworzenia workera &gt; zysk), pętle z małymi danymi.</div>
+          <div><strong>Worker pool:</strong> twórz N workerów przy starcie aplikacji i kolejkuj do nich zadania. Koszt tworzenia workera (~1 ms) amortyzuje się przez cały czas życia.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transferables -->
+    <div style="width:100%;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+      <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">TRANSFERABLE OBJECTS — zero-copy transfer</div>
+      <table class="transfer-table">
+        <thead>
+          <tr>
+            <th>Typ</th>
+            <th>Transfer możliwy?</th>
+            <th>Co się dzieje ze źródłem?</th>
+            <th>Kiedy używać</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">ArrayBuffer</code></td>
+            <td><span class="tag tag-green">TAK</span></td>
+            <td>Bufor staje się <strong>odłączony</strong> (<code style="font-size:11px">byteLength === 0</code>) — nie można już go czytać po stronie nadawcy</td>
+            <td>Duże dane binarne, obrazy, audio, dane sensoryczne</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">MessagePort</code></td>
+            <td><span class="tag tag-green">TAK</span></td>
+            <td>Port przechodzi do workera — dwukierunkowy kanał komunikacji</td>
+            <td>Trwałe, niskie-latency kanały między workerami</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">ImageBitmap</code></td>
+            <td><span class="tag tag-green">TAK</span></td>
+            <td>Źródło odłączone; GPU-resident texture transferowana bez kopiowania pikseli</td>
+            <td>Przenoszenie klatek video/canvas między wątkami</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">SharedArrayBuffer</code></td>
+            <td><span class="tag tag-yellow">DZIELONY</span></td>
+            <td>Oba wątki mają dostęp do <strong>tej samej pamięci</strong> — wymaga Atomics do synchronizacji</td>
+            <td>Bardzo wydajne dzielenie danych; wymaga COOP/COEP headers</td>
+          </tr>
+          <tr>
+            <td>Zwykły obiekt JS</td>
+            <td><span class="tag tag-red">NIE</span></td>
+            <td>Structured clone — kopia; oryginał niezmieniony</td>
+            <td>Małe dane konfiguracyjne, wyniki</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Kod -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="bench-panel">
+        <div class="bench-panel-header before">✗ &nbsp;Kopiowanie danych (structured clone)</div>
+        <pre><code class="language-javascript">// Main thread
+const bigArray = new Float32Array(10_000_000);
+fillData(bigArray);
+
+// postMessage bez transferu → kopiuje 40 MB
+worker.postMessage({ data: bigArray });
+
+// bigArray nadal dostępne po stronie głównej —
+// ale worker dostał kopię, mamy dwa bufory w pamięci
+// Czas transfer ~200–400 ms dla 40 MB</code></pre>
+      </div>
+      <div class="bench-panel">
+        <div class="bench-panel-header after">✓ &nbsp;Transfer (zero-copy)</div>
+        <pre><code class="language-javascript">// Main thread
+const bigArray = new Float32Array(10_000_000);
+fillData(bigArray);
+
+// Drugi argument to lista transferable objects
+// Bufor jest przenoszony, nie kopiowany — O(1) czas
+worker.postMessage(
+  { data: bigArray },
+  [bigArray.buffer]   // ← transfer lista
+);
+
+// bigArray.buffer.byteLength === 0 — odłączony!
+// Worker ma wyłączny dostęp do bufora</code></pre>
+      </div>
+    </div>
+
+    <!-- Reguła -->
+    <div style="width:100%;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+      <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">REGUŁA KCIUKA</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 14px;gap:10px;font-size:12px;line-height:1.6;color:var(--text);">
+        <div><strong style="color:var(--green);">Zawsze transferuj ArrayBuffer</strong><br/>Jeśli wysyłasz TypedArray lub ArrayBuffer do workera i nie potrzebujesz go dalej po stronie głównej, dodaj go do listy transferable. Zamienia O(n) kopię w O(1).</div>
+        <div><strong style="color:var(--green);">Worker pool zamiast tworzenia na żądanie</strong><br/>Koszt tworzenia workera to ~1–5 ms plus ładowanie skryptu. Dla zadań &lt;10 ms overhead przewyższy zysk. Utrzymuj pulę gotowych workerów.</div>
+        <div><strong style="color:var(--red);">SharedArrayBuffer = synchronizacja</strong><br/>Współdzielona pamięć bez Atomics to wyścig danych. Używaj <code style="font-family:var(--mono);font-size:11px">Atomics.wait()</code> / <code style="font-family:var(--mono);font-size:11px">Atomics.notify()</code> lub projektuj protokół bez blokad.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  initNav(19);
+  hljs.highlightAll();
+</script>
+</body>
+</html>

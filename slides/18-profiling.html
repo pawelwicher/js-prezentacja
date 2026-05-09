@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>20 — Profiling w praktyce | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    .prof-tabs { display: flex; gap: 4px; align-self: flex-start; margin-bottom: 2px; }
+    .prof-tab {
+      padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+      font-size: 12px; font-weight: 600; cursor: pointer; background: var(--surface);
+      color: var(--muted); transition: background 150ms, color 150ms;
+    }
+    .prof-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .prof-pane { display: none; width: 100%; }
+    .prof-pane.active { display: flex; flex-direction: column; gap: 10px; }
+
+    .legend-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .legend-row:last-child { border-bottom: none; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; margin-top: 2px; }
+    .legend-name { font-weight: 700; min-width: 130px; color: var(--text); font-family: var(--mono); font-size: 11px; }
+    .legend-desc { color: var(--muted); line-height: 1.5; }
+
+    .step-list { display: flex; flex-direction: column; gap: 6px; }
+    .step { display: flex; gap: 10px; align-items: flex-start; }
+    .step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step-body { font-size: 12px; line-height: 1.6; color: var(--text); padding-top: 2px; }
+    .step-body strong { color: var(--accent); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <h2>Profiling w praktyce — Chrome DevTools</h2>
+
+    <div class="prof-tabs">
+      <button class="prof-tab active" onclick="showTab('flame')">Flame Graph</button>
+      <button class="prof-tab" onclick="showTab('timeline')">Timeline / Performance</button>
+      <button class="prof-tab" onclick="showTab('memory')">Memory Panel</button>
+      <button class="prof-tab" onclick="showTab('api')">Performance API</button>
+    </div>
+
+    <!-- TAB: Flame Graph -->
+    <div class="prof-pane active" id="tab-flame">
+      <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">JAK CZYTAĆ FLAME GRAPH</div>
+          <div style="padding:10px 14px;font-size:12px;line-height:1.75;color:var(--text);display:flex;flex-direction:column;gap:6px;">
+            <div><strong>Oś X = czas</strong> — szerokość bloku to ile czasu dana funkcja (i jej callees) spędziła na stosie. Nie jest to oś chronologiczna — identyczne klatki stosu są scalane.</div>
+            <div><strong>Oś Y = głębokość stosu</strong> — blok na górze (root) to najwyższy poziom wywołania; bloki poniżej to wywołania zagnieżdżone.</div>
+            <div><strong>Szukaj szerokich bloków</strong> — szeroka klatka to gorące miejsce. Jeśli szeroki blok ma szerokie dzieci, problem leży głębiej. Jeśli nie ma dzieci lub są wąskie — to sam jest bottleneckiem.</div>
+            <div><strong>Odróżnij self time od total time</strong> — self time = czas w samej funkcji bez callees. Total time = cały stos. Optymalizuj funkcje z dużym self time.</div>
+          </div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">KATEGORIE W PROFILERZE CHROME</div>
+          <div style="padding:0;">
+            <div class="legend-row"><span class="legend-dot" style="background:#f4c26a;"></span><span class="legend-name">(program)</span><span class="legend-desc">Kod JS — Twój JavaScript i biblioteki. Szukaj tu wąskich gardeł aplikacji.</span></div>
+            <div class="legend-row"><span class="legend-dot" style="background:#a8c7fa;"></span><span class="legend-name">(garbage collector)</span><span class="legend-desc">Czas GC. Częste piki = zbyt wiele alokacji. Rozwiązanie: object pooling, TypedArray, WeakMap.</span></div>
+            <div class="legend-row"><span class="legend-dot" style="background:#c58af9;"></span><span class="legend-name">(idle)</span><span class="legend-desc">Przeglądarka czeka. Dobrze — oznacza, że wątek główny nie jest zablokowany.</span></div>
+            <div class="legend-row"><span class="legend-dot" style="background:#80cbc4;"></span><span class="legend-name">(renderer)</span><span class="legend-desc">Renderowanie: layout, paint, composite. Długie bloki tu = zbyt wiele operacji DOM lub layout thrashing.</span></div>
+            <div class="legend-row"><span class="legend-dot" style="background:#ef9a9a;"></span><span class="legend-name">(compilation)</span><span class="legend-desc">JIT — V8 kompiluje hot functions. Widoczne przy starcie. Nie powinno pojawiać się w ustabilizowanej pętli.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">WORKFLOW — jak znaleźć i potwierdzić bottleneck</div>
+        <div style="padding:12px 14px;">
+          <div class="step-list">
+            <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Nagraj profil w warunkach produkcyjnych</strong> — otwórz DevTools → Performance → nagraj 10–30 s rzeczywistego użycia. Unikaj nagrywania zimnego startu jeśli badasz steady-state.</div></div>
+            <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Znajdź długi task w głównym wątku</strong> — zaznacz przedział czasowy z problemem. Długie paski w "Main" Thread to "Long Tasks" (&gt;50 ms) blokujące responsywność.</div></div>
+            <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Rozwiń flame graph poniżej</strong> — zidentyfikuj najszerszy blok z dużym self time. Kliknij go, żeby zobaczyć plik i linię.</div></div>
+            <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Zmierz before/after</strong> — użyj <code style="font-family:var(--mono);font-size:11px">performance.mark()</code> i <code style="font-family:var(--mono);font-size:11px">performance.measure()</code> żeby precyzyjnie zmierzyć zmianę. Nie ufaj subiektywnym odczuciom.</div></div>
+            <div class="step"><div class="step-num">5</div><div class="step-body"><strong>Sprawdź GC pauses</strong> — zaznacz kategorię "GC" w timeline. Częste krótkie pauzy wskazują na high allocation rate; rzadkie długie — na promowanie dużych obiektów do old generation.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Timeline -->
+    <div class="prof-pane" id="tab-timeline">
+      <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">METRYKI DO OBSERWOWANIA</div>
+          <div style="padding:10px 14px;font-size:12px;line-height:1.75;color:var(--text);display:flex;flex-direction:column;gap:6px;">
+            <div><strong>FPS (klatki/s)</strong> — cel: stałe 60 fps = klatka co 16.6 ms. Spadki poniżej 30 fps są widoczne gołym okiem jako "jank".</div>
+            <div><strong>Long Tasks</strong> — zadania &gt;50 ms blokują wątek główny i uniemożliwiają odpowiedź na input. Widoczne jako czerwone trójkąty w profilerze.</div>
+            <div><strong>Heap size</strong> — rosnący heap przy stabilnym użyciu = wyciek pamięci. Zbyt częste GC = za dużo alokacji.</div>
+            <div><strong>Layout/Paint</strong> — wymuszony reflow (layout thrashing) pojawia się gdy JS odczytuje geometrię (offsetWidth) zaraz po zapisie do DOM w tej samej klatce.</div>
+          </div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">TYPOWE PUŁAPKI</div>
+          <div style="padding:10px 14px;font-size:12px;line-height:1.75;color:var(--text);display:flex;flex-direction:column;gap:6px;">
+            <div><strong style="color:var(--red);">Pomiar w trybie deweloperskim</strong> — DevTools i extensions spowalniają JS. Profiluj w trybie incognito bez rozszerzeń.</div>
+            <div><strong style="color:var(--red);">Tylko zimny start</strong> — JIT rozgrzewa się przez pierwsze sekundy. Nagraj profil po kilku sekundach rozgrzewki.</div>
+            <div><strong style="color:var(--red);">console.log() trzyma referencje</strong> — przekazanie obiektu do console.log utrzymuje go przy życiu w panelu DevTools. Fałszuje pomiar wycieku.</div>
+            <div><strong style="color:var(--green);">CPU throttling</strong> — użyj 4× lub 6× CPU slowdown żeby symulować słabsze urządzenia mobilne.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Memory -->
+    <div class="prof-pane" id="tab-memory">
+      <div style="width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">HEAP SNAPSHOT</div>
+          <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+            <div>Zrzut stanu sterty w danym momencie. Pokaż widok <strong>Comparison</strong> między dwoma snapshotami żeby zobaczyć co zostało zaalokowne i nie zwolnione.</div>
+            <div>Sortuj po <strong>Retained Size</strong> — to ile pamięci zostanie zwolnione gdy obiekt zostanie GC'd (włącznie z obiektami, które tylko ten obiekt utrzymuje przy życiu).</div>
+            <div>Szukaj <strong>Detached DOM nodes</strong> w filtrze — węzły DOM odłączone od drzewa ale nadal trzymane przez JS.</div>
+          </div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">ALLOCATION TIMELINE</div>
+          <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+            <div>Nagrywa alokacje w czasie rzeczywistym. Niebieski pasek = obiekt zaalokowny i nadal żywy. Szary = zwolniony przez GC.</div>
+            <div>Wybierz wycinek czasu gdzie heap rośnie i zbadaj co zostało zaalokowne — zobaczysz stos wywołań dla każdego obiektu.</div>
+            <div>Świetne do diagnozy <strong>retention loops</strong> — np. listener trzymający zamknięcie trzymające DOM trzymający element z handlerem.</div>
+          </div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">ALLOCATION SAMPLING</div>
+          <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+            <div>Lżejszy tryb — próbkuje alokacje zamiast rejestrować każdą. Mały overhead, można włączyć na dłużej.</div>
+            <div>Pokazuje które funkcje odpowiadają za <strong>największy wolumen alokacji</strong> — dobry punkt startowy gdy nie wiesz gdzie szukać.</div>
+            <div>Pamiętaj: duże alokacje to niekoniecznie wyciek — liczy się czy GC może je zwolnić. Sprawdź czy heap stabilizuje się po cyklu pracy.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Performance API -->
+    <div class="prof-pane" id="tab-api">
+      <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="bench-panel">
+          <div class="bench-panel-header before">✗ &nbsp;Pomiar przez Date.now() — nieprecyzyjny</div>
+          <pre><code class="language-javascript">// Date.now() ma rozdzielczość 1 ms i może być throttlowany
+const start = Date.now();
+doSomething();
+const elapsed = Date.now() - start;
+console.log(elapsed + ' ms'); // niewystarczająca precyzja</code></pre>
+        </div>
+        <div class="bench-panel">
+          <div class="bench-panel-header after">✓ &nbsp;Performance API — do 5 µs rozdzielczości</div>
+          <pre><code class="language-javascript">// Precyzyjny pomiar z nazwanymi markerami
+performance.mark('start-parse');
+const result = parseData(raw);
+performance.mark('end-parse');
+
+performance.measure('parse', 'start-parse', 'end-parse');
+
+const [entry] = performance.getEntriesByName('parse');
+console.log(entry.duration.toFixed(3) + ' ms');
+// Widoczne w DevTools Performance → Timings</code></pre>
+        </div>
+      </div>
+      <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="bench-panel">
+          <div class="bench-panel-header" style="background:var(--accent-light);color:var(--accent);">PerformanceObserver — monitorowanie w tle</div>
+          <pre><code class="language-javascript">// Obserwuj Long Tasks bez blokowania głównego wątku
+const obs = new PerformanceObserver(list => {
+  for (const entry of list.getEntries()) {
+    if (entry.duration > 50) {
+      console.warn('Long Task:', entry.duration.toFixed(1), 'ms');
+      // wyślij do systemu monitorowania
+    }
+  }
+});
+obs.observe({ type: 'longtask', buffered: true });</code></pre>
+        </div>
+        <div class="bench-panel">
+          <div class="bench-panel-header" style="background:var(--accent-light);color:var(--accent);">measureUserAgentSpecificMemory — pamięć w prod</div>
+          <pre><code class="language-javascript">// Dostępne tylko w cross-origin isolated context (COOP/COEP)
+if ('measureUserAgentSpecificMemory' in performance) {
+  const mem = await performance.measureUserAgentSpecificMemory();
+  console.log('Heap:', mem.bytes / 1024 / 1024, 'MB');
+  // mem.breakdown — podział wg typu zasobu
+}
+
+// Alternatywa: performance.memory (Chrome, niestandard)
+console.log(performance.memory?.usedJSHeapSize);</code></pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  initNav(18);
+  hljs.highlightAll();
+
+  function showTab(name) {
+    document.querySelectorAll('.prof-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.prof-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.target.classList.add('active');
+  }
+</script>
+</body>
+</html>

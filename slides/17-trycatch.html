@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>19 — try/catch a deoptymalizacja | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <h2>try/catch a deoptymalizacja TurboFan</h2>
+
+    <!-- 3 kolumny teorii -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:4px;">
+
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:#fef2f2;color:#991b1b;font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">DLACZEGO try/catch SZKODZI JIT</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div>TurboFan musi wygenerować dodatkowe <strong>tabele obsługi wyjątków</strong> i punkty przywrócenia stosu. Sprawia to, że kod wewnątrz try jest trudniejszy do analizy i rzadziej optymalizowany.</div>
+          <div>Historycznie V8 w ogóle nie optymalizował funkcji zawierających try/catch. Nowsze wersje (od V8 ~9.x) optymalizują je częściowo, ale <strong>inlining funkcji z try/catch pozostaje zablokowany</strong>.</div>
+          <div>Wyjątek zrzucony w środku try wymaga odwinięcia stosu — to zawsze jest wolna ścieżka. Wyjątki <strong>nie powinny być używane do sterowania przepływem</strong>.</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:#fffbeb;color:#92400e;font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">KIEDY TO MA ZNACZENIE</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>Hot loop</strong> — try/catch wewnątrz pętli wykonywanej miliony razy to najgorszy scenariusz: każda iteracja niesie koszt mechanizmu wyjątków.</div>
+          <div><strong>Małe funkcje pomocnicze</strong> — jeśli helper wywoływany z gorącej pętli sam zawiera try/catch, TurboFan nie zinlinuje go do pętli, tracąc całą optymalizację.</div>
+          <div><strong>Parsowanie JSON jako flow control</strong> — łapanie <code style="font-size:11px">SyntaxError</code> z <code style="font-size:11px">JSON.parse</code> jest drogie; lepiej walidować dane przed parsowaniem.</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="background:#f0fdf4;color:#166534;font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">PRAWIDŁOWE WZORCE</div>
+        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
+          <div><strong>Wypchnij try na zewnątrz pętli</strong> — obsługuj błędy na poziomie wywołującego, nie w środku gorącej ścieżki.</div>
+          <div><strong>Wydziel hot kernel</strong> — wyciągnij obliczenia do oddzielnej funkcji bez try/catch; zostanie ona zinlinowana przez TurboFan.</div>
+          <div><strong>Używaj wyników zamiast wyjątków</strong> — zwracaj <code style="font-size:11px">null</code> / <code style="font-size:11px">undefined</code> przy błędach przewidywalnych; rzucaj wyjątki tylko dla warunków naprawdę wyjątkowych.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kod -->
+    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;">
+      <div class="bench-panel">
+        <div class="bench-panel-header before">✗ &nbsp;try/catch w hot path</div>
+        <pre><code class="language-javascript">// try/catch wewnątrz pętli — brak inliningu kernela
+function processAll(items) {
+  let sum = 0;
+  for (let i = 0; i < items.length; i++) {
+    try {
+      sum += heavyKernel(items[i]); // nie zostanie zinlinowane!
+    } catch (e) {
+      // obsługa błędu
+    }
+  }
+  return sum;
+}
+
+// Wyjątek jako flow control — bardzo wolne
+function safeParse(str) {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null; // rzucany wyjątek = odwijanie stosu
+  }
+}</code></pre>
+      </div>
+      <div class="bench-panel">
+        <div class="bench-panel-header after">✓ &nbsp;try/catch poza hot path</div>
+        <pre><code class="language-javascript">// Wypchnij try na zewnątrz pętli
+function processAll(items) {
+  try {
+    let sum = 0;
+    for (let i = 0; i < items.length; i++) {
+      sum += heavyKernel(items[i]); // inlining działa ✓
+    }
+    return sum;
+  } catch (e) {
+    return 0;
+  }
+}
+
+// Walidacja zamiast łapania wyjątku
+function safeParse(str) {
+  if (typeof str !== 'string' || str[0] !== '{')
+    return null;        // tania ścieżka bez wyjątku
+  return JSON.parse(str);
+}</code></pre>
+      </div>
+    </div>
+
+    <!-- Benchmark -->
+    <div style="width:100%;margin-bottom:4px;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;">BENCHMARK — pętla z try/catch w środku vs try/catch na zewnątrz</div>
+      <div class="bench-run-row" style="margin-bottom:10px;">
+        <button class="run-btn" id="run-btn" onclick="runBench()">▶ Uruchom benchmark</button>
+        <span class="run-hint" id="hint">2 000 000 iteracji, 20 powtórzeń — żadne wyjątki nie są rzucane (mierzymy sam koszt try/catch).</span>
+      </div>
+      <div id="results" style="display:none;">
+        <div class="results-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="result-card">
+            <div class="rc-label">try poza pętlą</div>
+            <div class="rc-value good" id="r-outside">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">try w pętli</div>
+            <div class="rc-value bad" id="r-inside">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Spowolnienie</div>
+            <div class="rc-value highlight" id="r-ratio">—</div>
+            <div class="rc-sub">inside vs outside</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;width:100%;">
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:6px;">try poza pętlą</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-outside" style="width:0%;background:var(--green)"></div></div>
+          </div>
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:6px;">try w pętli</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-inside" style="width:0%;background:var(--red)"></div></div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px;align-self:flex-start;">
+          Różnica wynika głównie z braku inliningu kernela i dodatkowych tabel obsługi wyjątków per-iterację.
+        </p>
+      </div>
+    </div>
+
+    <!-- Reguła -->
+    <div style="width:100%;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+      <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">REGUŁA KCIUKA</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 14px;gap:10px;font-size:12px;line-height:1.6;color:var(--text);">
+        <div><strong style="color:var(--red);">try/catch poza gorącą pętlą</strong><br/>Owijaj pętlę jednym try zamiast wstawiać try wewnątrz każdej iteracji. Logika błędów i logika obliczeniowa — w osobnych funkcjach.</div>
+        <div><strong style="color:var(--red);">Wyjątki to nie flow control</strong><br/>Rzucanie wyjątku = odwijanie stosu + alokacja obiektu Error. Dla przewidywalnych błędów (brak wartości, zły format) zwracaj wartownik zamiast rzucać.</div>
+        <div><strong style="color:var(--green);">Nowoczesny V8 jest lepszy</strong><br/>Od V8 9.x try/catch jest mniej destrukcyjne niż historycznie, ale inlining przez granicę try nadal nie działa. Reguła wypchnięcia try na zewnątrz pozostaje ważna.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  initNav(17);
+  hljs.highlightAll();
+
+  async function runBench() {
+    const btn  = document.getElementById('run-btn');
+    const hint = document.getElementById('hint');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    hint.textContent = '';
+
+    await new Promise(r => setTimeout(r, 60));
+
+    const N    = 2_000_000;
+    const ITER = 20;
+    const WARM = 3;
+
+    function kernel(x) { return x * 1.0000001 + 1; }
+
+    function loopOutside() {
+      let s = 0;
+      try {
+        for (let i = 0; i < N; i++) s += kernel(i);
+      } catch (e) { /* nigdy */ }
+      return s;
+    }
+
+    function loopInside() {
+      let s = 0;
+      for (let i = 0; i < N; i++) {
+        try { s += kernel(i); } catch (e) { /* nigdy */ }
+      }
+      return s;
+    }
+
+    for (let i = 0; i < WARM; i++) loopOutside();
+    const t0 = performance.now();
+    for (let i = 0; i < ITER; i++) loopOutside();
+    const tOut = (performance.now() - t0) / ITER;
+
+    await new Promise(r => setTimeout(r, 40));
+
+    for (let i = 0; i < WARM; i++) loopInside();
+    const t1 = performance.now();
+    for (let i = 0; i < ITER; i++) loopInside();
+    const tIn = (performance.now() - t1) / ITER;
+
+    const fmt   = ms => ms.toFixed(1) + ' ms';
+    const ratio = (tIn / tOut).toFixed(1) + '×';
+
+    document.getElementById('r-outside').textContent = fmt(tOut);
+    document.getElementById('r-inside').textContent  = fmt(tIn);
+    document.getElementById('r-ratio').textContent   = ratio;
+
+    const max = Math.max(tOut, tIn);
+    document.getElementById('b-outside').style.width = (tOut / max * 100).toFixed(1) + '%';
+    document.getElementById('b-inside').style.width  = (tIn  / max * 100).toFixed(1) + '%';
+
+    document.getElementById('results').style.display = 'block';
+    btn.disabled = false;
+    btn.innerHTML = '↺ Uruchom ponownie';
+    hint.textContent = 'Wyniki mogą się różnić między przeglądarkami i wersjami V8.';
+  }
+</script>
+</body>
+</html>
