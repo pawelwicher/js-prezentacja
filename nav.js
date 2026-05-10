@@ -10,16 +10,14 @@ const SLIDES = [
   '08-mapandobject.html',
   '09-numberarrays.html',
   '10-hiddenclasses.html',
-  '11-weakmap.html',
-  '12-clone.html',
-  '13-deopt.html',
+  '11-deopt.html',
+  '12-weakmap.html',
+  '13-clone.html',
   '14-arraybuffer.html',
   '15-objectpool.html',
-  '16-inlining.html',
-  '17-trycatch.html',
-  '18-profiling.html',
-  '19-workers.html',
-  '20-podsumowanie.html',
+  '16-workers.html',
+  '17-profiling.html',
+  '18-podsumowanie.html',
 ];
 
 const TOTAL = SLIDES.length;
