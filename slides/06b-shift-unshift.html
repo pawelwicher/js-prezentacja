@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>shift/unshift vs push/pop | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="../assets/github.min.css" />
+  <script src="../assets/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; }
+    .info-panel { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+    .info-panel-header {
+      padding: 9px 14px; font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; border-bottom: 1px solid var(--border);
+    }
+    .info-panel-header.green { background: var(--green-light); color: var(--green); }
+    .info-panel-header.red   { background: var(--red-light); color: var(--red); }
+    .info-panel-body { padding: 11px 14px; display: flex; flex-direction: column; gap: 7px; }
+    .info-item { font-size: 12.5px; color: var(--muted); line-height: 1.55; display: flex; gap: 8px; }
+    .info-item::before { content: "•"; color: var(--border); flex-shrink: 0; margin-top: 2px; }
+    .info-item strong { color: var(--text); }
+    .info-item code { font-family: var(--mono); font-size: 11.5px; background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+    .tip-bar {
+      width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 12px 18px; display: flex; align-items: flex-start; gap: 12px;
+    }
+    .tip-bar .tip-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .tip-bar .tip-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .tip-bar .tip-text strong { color: var(--text); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <h2>Koniec vs początek tablicy — push/pop O(1), shift/unshift O(n)</h2>
+
+    <div class="two-col">
+      <div class="info-panel">
+        <div class="info-panel-header green">Operacje na końcu — tanie</div>
+        <div class="info-panel-body">
+          <div class="info-item"><code>push</code> / <code>pop</code> działają na <strong>ostatnim</strong> indeksie — nie ruszają pozostałych elementów</div>
+          <div class="info-item">Koszt <strong>O(1)</strong> amortyzowany (czasem realokacja bufora przy rozrastaniu, ale rzadko)</div>
+          <div class="info-item">Indeksy elementów się nie zmieniają — żadnego przepisywania</div>
+        </div>
+      </div>
+      <div class="info-panel">
+        <div class="info-panel-header red">Operacje na początku — drogie</div>
+        <div class="info-panel-body">
+          <div class="info-item"><code>shift</code> / <code>unshift</code> wstawiają/usuwają z <strong>przodu</strong> → wszystkie pozostałe elementy trzeba <strong>przenumerować</strong> (memmove)</div>
+          <div class="info-item">Pojedyncza operacja to <strong>O(n)</strong>; użycie tablicy jako kolejki przez <code>shift()</code> daje pętlę <strong>O(n²)</strong></div>
+          <div class="info-item"><code>splice</code> w środku też przesuwa „ogon" — również O(n)</div>
+          <div class="info-item"><strong>Lekarstwo:</strong> wskaźnik na głowę zamiast <code>shift</code>, bufor cykliczny, albo <code>push</code> + jednorazowy <code>reverse</code></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="bench-panel">
+        <div class="bench-panel-header before">✗ &nbsp;Kolejka przez shift() — O(n²)</div>
+        <pre><code class="language-javascript">const q = buildQueue(N); // [0,1,2,...,N-1]
+let sum = 0;
+while (q.length) {
+  // każdy shift przesuwa cały „ogon" tablicy
+  sum += q.shift();
+}</code></pre>
+      </div>
+      <div class="bench-panel">
+        <div class="bench-panel-header after">✓ &nbsp;Wskaźnik na głowę — O(n)</div>
+        <pre><code class="language-javascript">const q = buildQueue(N);
+let sum = 0, head = 0;
+while (head < q.length) {
+  // nic nie przesuwamy — tylko przesuwamy indeks
+  sum += q[head++];
+}
+// (opcjonalnie q.length = 0 na końcu)</code></pre>
+      </div>
+    </div>
+
+    <div style="width:100%;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;">BENCHMARK — opróżnianie kolejki 20 000 elementów</div>
+      <div class="bench-run-row" style="margin-bottom:10px;">
+        <button class="run-btn" id="run-btn" onclick="runBench()">▶ Uruchom benchmark</button>
+        <span class="run-hint" id="run-hint">20 000 elementów, 5 powtórzeń — średnia.</span>
+      </div>
+      <div id="results-1">
+        <div class="results-grid">
+          <div class="result-card">
+            <div class="rc-label">shift() — O(n²)</div>
+            <div class="rc-value bad" id="r-shift">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">wskaźnik — O(n)</div>
+            <div class="rc-value good" id="r-ptr">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Przyspieszenie</div>
+            <div class="rc-value highlight" id="r-speedup">—</div>
+            <div class="rc-sub">wskaźnik szybszy o</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;width:100%;">
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:6px;">shift()</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-shift" style="width:0%;background:var(--red)"></div></div>
+          </div>
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:6px;">wskaźnik</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-ptr" style="width:0%;background:var(--green)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip-bar">
+      <span class="tip-icon">🚦</span>
+      <span class="tip-text">
+        <strong>Klasyczna pułapka:</strong> tablica używana jako kolejka FIFO z <code style="font-family:var(--mono)">shift()</code>.
+        Przy tysiącach elementów koszt rośnie kwadratowo i potrafi zdominować profil. Trzymaj wskaźnik na głowę,
+        użyj bufora cyklicznego, albo gdy kolejność nie jest krytyczna — operuj wyłącznie na końcu (<code style="font-family:var(--mono)">push</code> / <code style="font-family:var(--mono)">pop</code>).
+      </span>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  'use strict';
+  initNav();
+  hljs.highlightAll();
+
+  let sink = 0;
+
+  function buildQueue(n) {
+    const q = new Array(n);
+    for (let i = 0; i < n; i++) q[i] = i;
+    return q;
+  }
+  function drainShift(n) {
+    const q = buildQueue(n);
+    let s = 0;
+    while (q.length) s += q.shift();
+    return s;
+  }
+  function drainPointer(n) {
+    const q = buildQueue(n);
+    let s = 0, head = 0;
+    while (head < q.length) s += q[head++];
+    return s;
+  }
+
+  function fmtSpeedup(a, b) {
+    const s = a / b;
+    return s >= 1000 ? '×' + (s / 1000).toFixed(1) + 'k' : '×' + s.toFixed(0);
+  }
+
+  async function runBench() {
+    const btn  = document.getElementById('run-btn');
+    const hint = document.getElementById('run-hint');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    hint.textContent = '';
+
+    await new Promise(r => setTimeout(r, 60));
+
+    const N = 20_000, ITER = 5, WARMUP = 1;
+
+    for (let i = 0; i < WARMUP; i++) sink += drainShift(N);
+    const t0 = performance.now();
+    for (let i = 0; i < ITER; i++) sink += drainShift(N);
+    const tShift = (performance.now() - t0) / ITER;
+
+    await new Promise(r => setTimeout(r, 40));
+
+    for (let i = 0; i < WARMUP; i++) sink += drainPointer(N);
+    const t1 = performance.now();
+    for (let i = 0; i < ITER; i++) sink += drainPointer(N);
+    const tPtr = (performance.now() - t1) / ITER;
+
+    const fmt = ms => ms.toFixed(2) + ' ms';
+    document.getElementById('r-shift').textContent   = fmt(tShift);
+    document.getElementById('r-ptr').textContent     = fmt(tPtr);
+    document.getElementById('r-speedup').textContent = fmtSpeedup(tShift, tPtr);
+
+    const max = Math.max(tShift, tPtr);
+    document.getElementById('b-shift').style.width = (tShift / max * 100).toFixed(1) + '%';
+    document.getElementById('b-ptr').style.width   = (tPtr   / max * 100).toFixed(1) + '%';
+
+    document.getElementById('results-1').classList.add('visible');
+    btn.disabled = false;
+    btn.innerHTML = '↺ Uruchom ponownie';
+    hint.textContent = 'Wyniki rosną kwadratowo z N dla shift(). (sink=' + (sink % 7) + ')';
+  }
+</script>
+</body>
+</html>

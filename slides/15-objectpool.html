@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Object Pooling | Techniki optymalizacyjne w JS</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../assets/github.min.css" />
+  <script src="../assets/highlight.min.js"></script>
   <link rel="stylesheet" href="../style.css" />
 </head>
 <body>
@@ -128,6 +128,15 @@ const pool = new ParticlePool(10_000);
       </div>
     </div>
 
+    <div style="width:100%;border:1px solid #fcd34d;border-radius:var(--radius);overflow:hidden;background:var(--yellow-light);">
+      <div style="background:var(--yellow-light);color:var(--yellow);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid #fcd34d;">⚠️ KIEDY POOLING SZKODZI</div>
+      <div style="padding:10px 14px;font-size:12px;line-height:1.65;color:var(--text);">
+        W nowoczesnym V8 pooling <strong>często nie pomaga, a bywa szkodliwy</strong>. Krótkożyjące obiekty są tanie dla kolektora Scavenge,
+        a trzymanie ich w puli sprawia, że <strong>awansują do old generation</strong> (droższy Mark-Sweep-Compact); sam pool dodaje też narzut zarządzania.
+        Traktuj go jako narzędzie do <strong>zmierzonych, wrażliwych na pauzy GC hot-pathów</strong> (silniki gier, symulacje, audio) — nie jako domyślny wzorzec aplikacyjny.
+      </div>
+    </div>
+
   </div>
 
   <div id="bottombar">
@@ -139,7 +148,7 @@ const pool = new ParticlePool(10_000);
 </div>
 <script src="../nav.js"></script>
 <script>
-  initNav(15);
+  initNav();
   hljs.highlightAll();
 
   function fmtSpeedup(a, b) {

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mity wydajnościowe | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="../assets/github.min.css" />
+  <script src="../assets/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; }
+    .myth-panel { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+    .myth-header {
+      padding: 9px 14px; font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; border-bottom: 1px solid var(--border);
+    }
+    .myth-header.green { background: var(--green-light); color: var(--green); }
+    .myth-header.red   { background: var(--red-light); color: var(--red); }
+    .myth-body { padding: 11px 14px; display: flex; flex-direction: column; gap: 9px; }
+    .myth-item { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+    .myth-item strong { color: var(--text); }
+    .myth-item code { font-family: var(--mono); font-size: 11.5px; background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+    .myth-item .why { display: block; font-size: 11.5px; color: #9ca3af; margin-top: 1px; }
+    .tip-bar {
+      width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 12px 18px; display: flex; align-items: flex-start; gap: 12px;
+    }
+    .tip-bar .tip-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .tip-bar .tip-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .tip-bar .tip-text strong { color: var(--text); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">Optymalizacja JS — silnik V8</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <h2>Mity wydajnościowe — co już nieaktualne, co wciąż prawdziwe</h2>
+
+    <div class="two-col">
+      <div class="myth-panel">
+        <div class="myth-header green">✓ Już można przestać się tym martwić</div>
+        <div class="myth-body">
+          <div class="myth-item"><strong>„<code>try/catch</code> uniemożliwia optymalizację"</strong>
+            <span class="why">Prawda dla starego Crankshafta. TurboFan optymalizuje funkcje z <code>try/catch</code> — nie trzeba już wyciągać pętli na zewnątrz.</span>
+          </div>
+          <div class="myth-item"><strong>„<code>let</code>/<code>const</code> są wolniejsze od <code>var</code>"</strong>
+            <span class="why">Różnica jest pomijalna, a per-iteration binding daje poprawne domknięcia w pętli. Używaj <code>const</code> domyślnie.</span>
+          </div>
+          <div class="myth-item"><strong>„<code>for</code> jest zawsze szybszy niż <code>forEach</code>/<code>map</code>"</strong>
+            <span class="why">Dla monomorficznych callbacków różnica bywa w granicach szumu. Czytelność wygrywa poza zmierzonymi hot-pathami.</span>
+          </div>
+          <div class="myth-item"><strong>„Cache'uj <code>arr.length</code>, używaj <code>++i</code> zamiast <code>i++</code>"</strong>
+            <span class="why">JIT i tak to robi. Mikro-sztuczki z lat 2000. nie dają dziś nic mierzalnego.</span>
+          </div>
+          <div class="myth-item"><strong>„Małe funkcje są drogie — wklejaj ręcznie"</strong>
+            <span class="why">TurboFan inline'uje gorące, monomorficzne funkcje. Abstrakcja zwykle nic nie kosztuje.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="myth-panel">
+        <div class="myth-header red">✗ To NADAL realnie kosztuje</div>
+        <div class="myth-body">
+          <div class="myth-item"><strong><code>delete obj.prop</code></strong>
+            <span class="why">Wciąż degraduje obiekt do dictionary mode i unieważnia inline cache. Zamiast tego <code>obj.prop = null</code>.</span>
+          </div>
+          <div class="myth-item"><strong>Zmiana kształtu obiektu w hot path</strong>
+            <span class="why">Dodawanie pól po konstrukcji, różna kolejność pól → nowe Hidden Classes i deopt. To dalej prawda.</span>
+          </div>
+          <div class="myth-item"><strong>Megamorficzne call-site</strong>
+            <span class="why">&gt;4 kształty w jednym miejscu → koniec specjalizacji i koniec inliningu. Realny koszt.</span>
+          </div>
+          <div class="myth-item"><strong>Tablica jako kolejka przez <code>shift()</code></strong>
+            <span class="why">Nadal O(n²). Memmove na każdym kroku nie zniknął.</span>
+          </div>
+          <div class="myth-item"><strong>Nieograniczony cache i zagnieżdżone kwantyfikatory regex</strong>
+            <span class="why">Wyciek pamięci i catastrophic backtracking to problemy ponadczasowe — i często groźne dla bezpieczeństwa.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:100%;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;">BENCHMARK — funkcja owinięta w <code style="font-family:var(--mono)">try/catch</code> vs bez</div>
+      <div class="bench-run-row" style="margin-bottom:10px;">
+        <button class="run-btn" id="run-btn" onclick="runBench()">▶ Uruchom benchmark</button>
+        <span class="run-hint" id="run-hint">10 000 000 iteracji, 20 powtórzeń — średnia.</span>
+      </div>
+      <div id="results-1">
+        <div class="results-grid">
+          <div class="result-card">
+            <div class="rc-label">W try/catch</div>
+            <div class="rc-value" id="r-try" style="color:var(--text);">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Bez try/catch</div>
+            <div class="rc-value good" id="r-plain">—</div>
+            <div class="rc-sub">czas wykonania</div>
+          </div>
+          <div class="result-card">
+            <div class="rc-label">Różnica</div>
+            <div class="rc-value highlight" id="r-ratio">—</div>
+            <div class="rc-sub">try vs bez</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;width:100%;">
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;">W try/catch</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-try" style="width:0%;background:var(--accent)"></div></div>
+          </div>
+          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
+            <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:6px;">Bez try/catch</div>
+            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b-plain" style="width:0%;background:var(--green)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip-bar">
+      <span class="tip-icon">🧭</span>
+      <span class="tip-text">
+        <strong>Mity biorą się z prawdziwych obserwacji — sprzed lat.</strong>
+        V8 zmienia się co kilka tygodni, więc rada „zawsze rób X" szybko się starzeje. Jedyna ponadczasowa zasada:
+        <strong>zmierz na swojej wersji silnika</strong>, zanim przepiszesz kod w imię wydajności.
+      </span>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  'use strict';
+  initNav();
+  hljs.highlightAll();
+
+  let sink = 0;
+
+  function withTry(n) {
+    try {
+      let s = 0;
+      for (let i = 0; i < n; i++) s += i * 2;
+      return s;
+    } catch (e) { return 0; }
+  }
+  function withoutTry(n) {
+    let s = 0;
+    for (let i = 0; i < n; i++) s += i * 2;
+    return s;
+  }
+
+  async function runBench() {
+    const btn  = document.getElementById('run-btn');
+    const hint = document.getElementById('run-hint');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    hint.textContent = '';
+
+    await new Promise(r => setTimeout(r, 60));
+
+    const N = 10_000_000, ITER = 20, WARMUP = 3;
+
+    for (let i = 0; i < WARMUP; i++) sink += withTry(N);
+    const t0 = performance.now();
+    for (let i = 0; i < ITER; i++) sink += withTry(N);
+    const tTry = (performance.now() - t0) / ITER;
+
+    await new Promise(r => setTimeout(r, 40));
+
+    for (let i = 0; i < WARMUP; i++) sink += withoutTry(N);
+    const t1 = performance.now();
+    for (let i = 0; i < ITER; i++) sink += withoutTry(N);
+    const tPlain = (performance.now() - t1) / ITER;
+
+    const fmt = ms => ms.toFixed(2) + ' ms';
+    document.getElementById('r-try').textContent   = fmt(tTry);
+    document.getElementById('r-plain').textContent = fmt(tPlain);
+    document.getElementById('r-ratio').textContent = '×' + (tTry / tPlain).toFixed(2);
+
+    const max = Math.max(tTry, tPlain);
+    document.getElementById('b-try').style.width   = (tTry   / max * 100).toFixed(1) + '%';
+    document.getElementById('b-plain').style.width = (tPlain / max * 100).toFixed(1) + '%';
+
+    document.getElementById('results-1').classList.add('visible');
+    btn.disabled = false;
+    btn.innerHTML = '↺ Uruchom ponownie';
+    hint.textContent = 'Oczekiwany wynik ~×1.0 — try/catch nie blokuje już optymalizacji. (sink=' + (sink % 7) + ')';
+  }
+</script>
+</body>
+</html>

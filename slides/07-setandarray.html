@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Set vs Array | Techniki optymalizacyjne w JS</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../assets/github.min.css" />
+  <script src="../assets/highlight.min.js"></script>
   <link rel="stylesheet" href="../style.css" />
 </head>
 <body>
@@ -52,8 +52,8 @@
       <div class="bench-layout">
         <div class="bench-panel">
           <div class="bench-panel-header before">✗ &nbsp;Array — includes(x) &nbsp;O(n)</div>
-          <pre><code class="language-javascript">// Filtrujemy 1 000 losowych wartości
-// obecnych w tablicy 100 000 elementów
+          <pre><code class="language-javascript">// 1 000 losowych zapytań, zbiór 100 000;
+// część trafia poza zakres → includes skanuje całość
 function searchArray(arr, queries) {
   return queries.filter(q => arr.includes(q));
 }
@@ -62,8 +62,8 @@ searchArray(data, queries);</code></pre>
         </div>
         <div class="bench-panel">
           <div class="bench-panel-header after">✓ &nbsp;Set — has(x) &nbsp;O(1)</div>
-          <pre><code class="language-javascript">// Filtrujemy 1 000 losowych wartości
-// obecnych w Set 100 000 elementów
+          <pre><code class="language-javascript">// 1 000 losowych zapytań, zbiór 100 000;
+// has() to O(1) niezależnie od trafienia
 function searchSet(set, queries) {
   return queries.filter(q => set.has(q));
 }
@@ -175,7 +175,7 @@ function dedupSet(arr) {
 </div>
 <script src="../nav.js"></script>
 <script>
-  initNav(7);
+  initNav();
   hljs.highlightAll();
 
   function fmtSpeedup(a, b) {

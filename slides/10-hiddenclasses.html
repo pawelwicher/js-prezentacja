@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hidden Classes | Techniki optymalizacyjne w JS</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../assets/github.min.css" />
+  <script src="../assets/highlight.min.js"></script>
   <link rel="stylesheet" href="../style.css" />
   <style>
     .hc-table {
@@ -101,7 +101,7 @@
           <div>V8 nie przechowuje nazw właściwości w każdym obiekcie. Zamiast tego tworzy wewnętrzną strukturę <strong>Hidden Class</strong> (w kodzie V8 nazywana <em>Map</em>), która opisuje <em>kształt</em> obiektu: jakie pola istnieją i pod jakim offsetem w pamięci.</div>
           <div>Obiekty o identycznym zestawie pól (dodawanych w tej samej kolejności) <strong>współdzielą jedną Hidden Class</strong>. Dostęp do pola to wtedy proste przesunięcie w pamięci — jak w struct w C.</div>
           <div><strong>Inline Cache (IC)</strong> — przy każdym odczycie <code style="font-family:var(--mono);font-size:11px">obj.x</code> V8 zapamiętuje Hidden Class obiektu i kompiluje bezpośredni skok. Następne wywołanie z tym samym kształtem trafia w gotowy kod maszynowy.</div>
-          <div><strong>Deoptymalizacja</strong> — gdy IC napotka nowy kształt (polymorphic/megamorphic), optymalizacja jest cofana i JIT zaczyna od nowa.</div>
+          <div><strong>Megamorphic ≠ deopt</strong> — zmiana stanu IC (mono→poly→mega) tylko obniża stopień specjalizacji dostępu. <em>Deoptymalizacja</em> to osobne zdarzenie: zoptymalizowany kod TurboFana trafia na nieoczekiwany kształt, zostaje odrzucony i wykonanie wraca do interpretera.</div>
         </div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
@@ -267,7 +267,7 @@ for (let i = 0; i < N; i++) {
 <script src="../nav.js"></script>
 <script>
   'use strict';
-  initNav(10);
+  initNav();
   hljs.highlightAll();
 
   const N    = 500_000;

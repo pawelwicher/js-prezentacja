@@ -4,13 +4,18 @@ const SLIDES = [
   '02-wstep.html',
   '03-pamiec.html',
   '04-kompilacjav8.html',
+  '04b-inlining.html',
   '05-liczby.html',
+  '05b-strings.html',
+  '05c-regexp.html',
   '06-tablice.html',
+  '06b-shift-unshift.html',
   '07-setandarray.html',
   '08-mapandobject.html',
   '09-numberarrays.html',
   '10-hiddenclasses.html',
   '11-deopt.html',
+  '11b-mity.html',
   '12-weakmap.html',
   '13-clone.html',
   '14-arraybuffer.html',
@@ -25,7 +30,15 @@ const TOTAL = SLIDES.length;
 const FIRST_FILE = SLIDES[0];
 const LAST_FILE  = SLIDES[SLIDES.length - 1];
 
+// Indeks slajdu jest wykrywany z nazwy pliku — kolejność definiuje wyłącznie
+// tablica SLIDES, więc dodanie/przesunięcie slajdu nie wymaga zmian w plikach.
 function initNav(currentIndex) {
+  if (currentIndex == null) {
+    const file = location.pathname.split('/').pop();
+    currentIndex = SLIDES.indexOf(file);
+    if (currentIndex === -1) currentIndex = 0;
+  }
+
   const counter = document.getElementById('counter');
   const btnPrev = document.getElementById('btn-prev');
   const btnNext = document.getElementById('btn-next');

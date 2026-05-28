@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Typy tablic w V8 | Techniki optymalizacyjne w JS</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../assets/github.min.css" />
+  <script src="../assets/highlight.min.js"></script>
   <link rel="stylesheet" href="../style.css" />
   <style>
     .ek-table {
@@ -177,7 +177,9 @@ function benchRead(array) {
           </table>
         </div>
         <p style="font-size:12px;color:var(--muted);margin-top:8px;align-self:flex-start;">
-          Wyniki zależą od przeglądarki i wersji V8.
+          Wyniki zależą od przeglądarki i wersji V8. <strong>Uwaga metodologiczna:</strong> wariant DICTIONARY ma
+          <code style="font-family:var(--mono);font-size:11px">length ≈ 10×N</code> (indeksy co 10), więc pętla odczytu iteruje ~10× więcej slotów niż
+          warianty PACKED/HOLEY — część jego „wolności" to po prostu więcej iteracji po dziurach, nie tylko sam tryb słownikowy.
         </p>
       </div>
     </div>
@@ -194,7 +196,7 @@ function benchRead(array) {
 <script src="../nav.js"></script>
 <script>
   'use strict';
-  initNav(9);
+  initNav();
   hljs.highlightAll();
 
   const N    = 100_000;

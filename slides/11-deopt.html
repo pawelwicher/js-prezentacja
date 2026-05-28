@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Deoptymalizacja funkcji | Techniki optymalizacyjne w JS</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="../assets/github.min.css" />
+  <script src="../assets/highlight.min.js"></script>
   <link rel="stylesheet" href="../style.css" />
 </head>
 <body>
@@ -44,11 +44,11 @@
       </div>
 
       <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="background:#fef2f2;color:#991b1b;font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">MEGAMORPHIC — bailout</div>
+        <div style="background:#fef2f2;color:#991b1b;font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">MEGAMORPHIC — generyczny lookup</div>
         <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
           <div><strong>Definicja</strong> — ponad 4 różne kształty; IC się poddaje i przełącza w tryb globalny</div>
           <div><strong>Co robi V8</strong> — każde wywołanie odpytuje globalny stub cache (hash lookup); brak specjalizacji, brak inline cache</div>
-          <div><strong>Deoptymalizacja</strong> — Turbofan może wycofać skompilowany kod i wrócić do interpretera (bailout), jeśli założenie o typie zostało złamane</div>
+          <div><strong>Deopt to osobne zjawisko</strong> — Turbofan wycofuje skompilowany kod i wraca do interpretera, gdy złamane zostaje <em>konkretne założenie o typie</em> — a nie sam fakt megamorfizmu</div>
           <div><strong>Przykład</strong> — generyczna funkcja <code style="font-family:var(--mono);font-size:11px">serialize(x)</code> wywoływana z dowolnym obiektem</div>
         </div>
       </div>
@@ -154,7 +154,7 @@ const shapes = [
 </div>
 <script src="../nav.js"></script>
 <script>
-  initNav(11);
+  initNav();
   hljs.highlightAll();
 
   function fmtSpeedup(a, b) {
