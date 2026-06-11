@@ -3,305 +3,68 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tablice w V8 | Optymalizacja JS — silnik V8</title>
+  <title>Tablice — elements kinds | Techniki optymalizacyjne w JS</title>
   <link rel="stylesheet" href="../assets/github.min.css" />
   <script src="../assets/highlight.min.js"></script>
   <link rel="stylesheet" href="../style.css" />
-  <style>
-    .arr-tabs {
-      display: flex;
-      gap: 4px;
-      align-self: flex-start;
-      border-bottom: 2px solid var(--border);
-      width: 100%;
-      margin-bottom: 0;
-    }
-    .arr-tab {
-      padding: 6px 16px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-      border: 1px solid transparent;
-      border-bottom: none;
-      border-radius: var(--radius) var(--radius) 0 0;
-      background: transparent;
-      transition: background 150ms, color 150ms;
-      margin-bottom: -2px;
-      user-select: none;
-    }
-    .arr-tab:hover { background: var(--bg); color: var(--text); }
-    .arr-tab.active {
-      background: var(--surface);
-      color: var(--accent);
-      border-color: var(--border);
-      border-bottom-color: var(--surface);
-    }
-    .arr-page { display: none; width: 100%; flex-direction: column; gap: 16px; }
-    .arr-page.active { display: flex; }
-
-    .two-col {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      width: 100%;
-    }
-    .three-col {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 14px;
-      width: 100%;
-    }
-    .info-panel {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      background: var(--surface);
-    }
-    .info-panel-header {
-      padding: 9px 14px;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .07em;
-      border-bottom: 1px solid var(--border);
-    }
-    .info-panel-header.blue   { background: var(--accent-light); color: var(--accent); }
-    .info-panel-header.yellow { background: var(--yellow-light); color: var(--yellow); }
-    .info-panel-header.red    { background: var(--red-light); color: var(--red); }
-    .info-panel-header.green  { background: var(--green-light); color: var(--green); }
-    .info-panel-header.purple { background: #f5f3ff; color: #7c3aed; }
-    .info-panel-body {
-      padding: 11px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-    }
-    .info-item {
-      font-size: 12.5px;
-      color: var(--muted);
-      line-height: 1.55;
-      display: flex;
-      gap: 8px;
-    }
-    .info-item::before { content: "•"; color: var(--border); flex-shrink: 0; margin-top: 2px; }
-    .info-item strong { color: var(--text); }
-    .info-item code {
-      font-family: var(--mono);
-      font-size: 11.5px;
-      background: #f3f4f6;
-      padding: 1px 5px;
-      border-radius: 4px;
-    }
-
-    .kind-svg-box {
-      width: 100%;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--surface);
-      overflow: hidden;
-    }
-    .kind-svg-box svg { display: block; width: 100%; height: auto; }
-
-    .tip-bar {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 18px;
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-    }
-    .tip-bar .tip-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-    .tip-bar .tip-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
-    .tip-bar .tip-text strong { color: var(--text); }
-  </style>
 </head>
 <body>
 <div id="app">
 
   <div id="topbar">
-    <span class="title">Optymalizacja JS — silnik V8</span>
+    <span class="title">optymalizacja-js</span>
     <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
     <span class="counter" id="counter"></span>
   </div>
 
   <div id="slide">
-    <h1>Tablice w V8 — Elements Kinds</h1>
+    <h1>tablice — elements kinds</h1>
 
-    <div class="arr-tabs">
-      <button class="arr-tab active" onclick="showTab('hierarchy')">Hierarchia typów</button>
-      <button class="arr-tab" onclick="showTab('holey')">Packed vs Holey</button>
+    <div class="clue">
+      V8 śledzi, <b>co tablica trzyma w środku</b> i dobiera reprezentację: od upakowanych intów po hash mapę.
+      Przejścia są <b>jednokierunkowe</b> — jeden zły <code>push</code> degraduje tablicę na zawsze.
     </div>
 
-    <!-- TAB 1: Hierarchia -->
-    <div class="arr-page active" id="tab-hierarchy">
+    <div class="ascii"><b>PACKED_SMI</b> ──float──→ <b>PACKED_DOUBLE</b> ──obiekt/string──→ <b>PACKED_ELEMENTS</b>
+   │ dziura              │ dziura                         │ dziura
+   ▼                     ▼                                ▼
+<b>HOLEY_SMI</b> ──────────→ <b>HOLEY_DOUBLE</b> ──────────────────→ <b>HOLEY_ELEMENTS</b>
 
-      <!-- Diagram przejść -->
-      <div class="kind-svg-box">
-        <svg viewBox="0 0 720 138" xmlns="http://www.w3.org/2000/svg"
-             font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12">
-          <defs>
-            <marker id="arr-d" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-              <path d="M0,0 L7,3.5 L0,7 Z" fill="#9ca3af"/>
-            </marker>
-            <marker id="arr-down" markerWidth="7" markerHeight="7" refX="3.5" refY="0" orient="auto-start-reverse">
-              <path d="M0,0 L7,0 L3.5,7 Z" fill="#9ca3af"/>
-            </marker>
-          </defs>
+← nigdy w lewo, nigdy w górę · dziura = delete, new Array(N), zapis poza length
+bardzo rzadka tablica (zapis &gt;1024 ponad length) → <b>DICTIONARY</b> — hash mapa zamiast bufora</div>
 
-          <!-- Row labels -->
-          <text x="8" y="42" font-size="10" font-weight="700" fill="#15803d">PACKED</text>
-          <text x="8" y="98" font-size="10" font-weight="700" fill="#d97706">HOLEY</text>
-
-          <!-- PACKED_SMI_ELEMENTS -->
-          <rect x="58" y="20" width="172" height="38" rx="5" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
-          <text x="144" y="36" text-anchor="middle" font-size="11" font-weight="700" fill="#15803d">PACKED_SMI_ELEMENTS</text>
-          <text x="144" y="51" text-anchor="middle" font-size="10" fill="#16a34a">małe liczby całkowite · bez boxingu</text>
-
-          <!-- arrow right → -->
-          <line x1="232" y1="39" x2="258" y2="39" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr-d)"/>
-
-          <!-- PACKED_DOUBLE_ELEMENTS -->
-          <rect x="260" y="20" width="180" height="38" rx="5" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
-          <text x="350" y="36" text-anchor="middle" font-size="11" font-weight="700" fill="#d97706">PACKED_DOUBLE_ELEMENTS</text>
-          <text x="350" y="51" text-anchor="middle" font-size="10" fill="#d97706">64-bit double · ciągły bufor</text>
-
-          <!-- arrow right → -->
-          <line x1="441" y1="39" x2="467" y2="39" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr-d)"/>
-
-          <!-- PACKED_ELEMENTS -->
-          <rect x="469" y="20" width="155" height="38" rx="5" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
-          <text x="547" y="36" text-anchor="middle" font-size="11" font-weight="700" fill="#dc2626">PACKED_ELEMENTS</text>
-          <text x="547" y="51" text-anchor="middle" font-size="10" fill="#dc2626">referencje · mieszane typy</text>
-
-          <!-- down arrows -->
-          <line x1="144" y1="59" x2="144" y2="76" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr-d)"/>
-          <line x1="350" y1="59" x2="350" y2="76" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr-d)"/>
-          <line x1="547" y1="59" x2="547" y2="76" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr-d)"/>
-
-          <!-- HOLEY_SMI_ELEMENTS -->
-          <rect x="58" y="78" width="172" height="38" rx="5" fill="#fefce8" stroke="#fde68a" stroke-width="1.5"/>
-          <text x="144" y="94" text-anchor="middle" font-size="11" font-weight="700" fill="#d97706">HOLEY_SMI_ELEMENTS</text>
-          <text x="144" y="109" text-anchor="middle" font-size="10" fill="#d97706">dziury · sprawdzanie brakujących</text>
-
-          <!-- arrow right → -->
-          <line x1="232" y1="97" x2="258" y2="97" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr-d)"/>
-
-          <!-- HOLEY_DOUBLE_ELEMENTS -->
-          <rect x="260" y="78" width="180" height="38" rx="5" fill="#fefce8" stroke="#fde68a" stroke-width="1.5"/>
-          <text x="350" y="94" text-anchor="middle" font-size="11" font-weight="700" fill="#d97706">HOLEY_DOUBLE_ELEMENTS</text>
-          <text x="350" y="109" text-anchor="middle" font-size="10" fill="#d97706">double + dziury</text>
-
-          <!-- arrow right → -->
-          <line x1="441" y1="97" x2="467" y2="97" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr-d)"/>
-
-          <!-- HOLEY_ELEMENTS -->
-          <rect x="469" y="78" width="155" height="38" rx="5" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
-          <text x="547" y="94" text-anchor="middle" font-size="11" font-weight="700" fill="#dc2626">HOLEY_ELEMENTS</text>
-          <text x="547" y="109" text-anchor="middle" font-size="10" fill="#dc2626">najwolniejszy wariant</text>
-
-          <!-- label one-way -->
-          <text x="350" y="128" text-anchor="middle" font-size="10" fill="#9ca3af">przejścia są jednokierunkowe — V8 nigdy nie cofa degradacji</text>
-        </svg>
-      </div>
-
-      <div class="three-col">
-        <div class="info-panel">
-          <div class="info-panel-header green">PACKED_SMI_ELEMENTS</div>
-          <div class="info-panel-body">
-            <div class="info-item">Wyłącznie SMI (Small Integers) — liczby mieszczące się w 31 bitach</div>
-            <div class="info-item">Wartości przechowywane <strong>bezpośrednio</strong> — brak boxingu na stercie</div>
-            <div class="info-item">Najszybszy wariant: operacje arytmetyczne przez CPU bez narzutu</div>
-            <div class="info-item"><code>const a = [1, 2, 3]</code> startuje tutaj</div>
-          </div>
-        </div>
-        <div class="info-panel">
-          <div class="info-panel-header yellow">PACKED_DOUBLE_ELEMENTS</div>
-          <div class="info-panel-body">
-            <div class="info-item">Przynajmniej jeden element nie jest SMI (np. <code>3.14</code>, duża liczba całkowita)</div>
-            <div class="info-item">Wszystkie elementy jako <strong>64-bitowe double</strong> w ciągłym buforze pamięci</div>
-            <div class="info-item">Wyzwalane przez <code>a.push(3.14)</code> na tablicy SMI — przejście nieodwracalne</div>
-          </div>
-        </div>
-        <div class="info-panel">
-          <div class="info-panel-header red">PACKED_ELEMENTS</div>
-          <div class="info-panel-body">
-            <div class="info-item">Stringi, obiekty, mieszanka typów — elementy są <strong>referencjami</strong> na stercie</div>
-            <div class="info-item">TurboFan nie może generować wyspecjalizowanego kodu maszynowego</div>
-            <div class="info-item">Wyzwalane przez dodanie nieuzgodnionego typu: <code>a.push("hello")</code></div>
-          </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="ph ok">packed — zwarty bufor</div>
+        <div class="pb">
+          <div>Każdy indeks ma wartość → odczyt bez sprawdzania, <b>JIT generuje kod jak dla tablicy w C</b></div>
+          <div>SMI: inty bez boxingu · DOUBLE: unboxed 8 B/element · ELEMENTS: wskaźniki</div>
         </div>
       </div>
-
-      <div class="code-block">
-        <div class="cb-header"><span>elements-kinds.js</span></div>
-        <pre><code class="language-javascript">const a = [1, 2, 3];        // PACKED_SMI_ELEMENTS
-a.push(3.14);               // → PACKED_DOUBLE_ELEMENTS  (nieodwracalne)
-a.push("hello");            // → PACKED_ELEMENTS         (nieodwracalne)
-
-// Nawet usunięcie stringów nie przywróci poprzedniego stanu:
-a.pop();                    // dalej PACKED_ELEMENTS
-
-// Diagnostyka w Node.js z --allow-natives-syntax:
-// %DebugPrint([1, 2, 3]);  // elements: PACKED_SMI_ELEMENTS</code></pre>
+      <div class="panel">
+        <div class="ph bad">holey — tablica z dziurami</div>
+        <div class="pb">
+          <div>Każdy odczyt: <b>czy to dziura?</b> — a dziura może mieć wartość z <code>Array.prototype</code>, więc trzeba sprawdzać prototypy</div>
+          <div>Dziurę robi <code>new Array(N)</code>, <code>delete arr[i]</code>, <code>[1, , 3]</code>, zapis poza <code>length</code></div>
+        </div>
       </div>
     </div>
 
-    <!-- TAB 2: Packed vs Holey -->
-    <div class="arr-page" id="tab-holey">
+    <div class="code-block">
+      <div class="cb-header"><span>elements-kinds.js — node --allow-natives-syntax</span></div>
+      <pre><code class="language-javascript">const a = [1, 2, 3];   // PACKED_SMI_ELEMENTS — najszybszy layout
+a.push(3.14);          // → PACKED_DOUBLE_ELEMENTS   (nieodwracalne)
+a.push("hello");       // → PACKED_ELEMENTS          (nieodwracalne)
+a.pop();               // dalej PACKED_ELEMENTS — usunięcie nie cofa degradacji
+delete a[0];           // → HOLEY_ELEMENTS — najwolniejszy wariant liniowy
 
-      <div class="two-col">
-        <div class="info-panel">
-          <div class="info-panel-header green">Packed — zwarty układ</div>
-          <div class="info-panel-body">
-            <div class="info-item">Wszystkie indeksy od <code>0</code> do <code>length−1</code> mają przypisaną wartość</div>
-            <div class="info-item">Odczyt dowolnego indeksu jest natychmiastowy — brak sprawdzania istnienia</div>
-            <div class="info-item">Tworzony przez literał z wartościami: <code>[1, 2, 3]</code></div>
-            <div class="info-item">TurboFan może wygenerować <strong>uproszczony, szybki</strong> kod bez gałęzi na brakujące elementy</div>
-          </div>
-        </div>
-        <div class="info-panel">
-          <div class="info-panel-header red">Holey — tablica z dziurami</div>
-          <div class="info-panel-body">
-            <div class="info-item">Przynajmniej jeden indeks jest "dziurą" — wartość nigdy nieprzypisana</div>
-            <div class="info-item">Każdy odczyt wymaga sprawdzenia: czy element istnieje? Jeśli nie — <strong>wspięcie po łańcuchu prototypów</strong> (<code>Array.prototype</code>, <code>Object.prototype</code>)</div>
-            <div class="info-item">Dziura może zwrócić cokolwiek z prototypu — stąd konieczność sprawdzania</div>
-            <div class="info-item">Przejście <strong>PACKED → HOLEY</strong> jest nieodwracalne</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="code-block">
-        <div class="cb-header"><span>holey.js</span></div>
-        <pre><code class="language-javascript">const a = [1, 2, 3];        // PACKED_SMI_ELEMENTS
-a[100] = 4;                 // → HOLEY_SMI_ELEMENTS (indeksy 3–99 to dziury)
-
-const b = new Array(3);     // od razu HOLEY_SMI_ELEMENTS!
-                            // Array(n) tworzy tablicę z dziurami
-
-const c = [1, , 3];        // HOLEY_SMI_ELEMENTS — dziura w środku
-
-// delete tworzy dziurę:
-const d = [1, 2, 3];       // PACKED_SMI_ELEMENTS
-delete d[1];               // → HOLEY_SMI_ELEMENTS — unikaj delete!
-
-// Sprawdź na prototypie co się dzieje z dziurami:
-Array.prototype[1] = "z prototypu";
-console.log([1, , 3][1]);  // "z prototypu" — dlatego V8 musi sprawdzać!</code></pre>
-      </div>
-
-      <div class="tip-bar">
-        <span class="tip-icon">⚡</span>
-        <span class="tip-text">
-          <strong>Różnica wydajności:</strong> w gorącej pętli PACKED_SMI_ELEMENTS potrafi być
-          <strong>2–5× szybsze</strong> niż HOLEY_ELEMENTS. SMI nie wymaga boxowania, packed nie
-          sprawdza dziur, jednorodny typ pozwala TurboFanowi generować wyspecjalizowany kod maszynowy.
-        </span>
-      </div>
+%DebugPrint(a);        // ← podgląd aktualnego elements kind</code></pre>
     </div>
 
+    <div class="tip">
+      <b>Reguły:</b> nie używaj <code>new Array(N)</code> (→ <code>Array.from</code>) ani <code>delete arr[i]</code> (→ <code>splice</code>);
+      trzymaj jednorodne typy. Pomiar wpływu na odczyt — slajd 10.
+    </div>
 
   </div>
 
@@ -313,18 +76,6 @@ console.log([1, , 3][1]);  // "z prototypu" — dlatego V8 musi sprawdzać!</cod
 
 </div>
 <script src="../nav.js"></script>
-<script>
-  initNav();
-  hljs.highlightAll();
-
-  function showTab(name) {
-    const pages = ['hierarchy', 'holey'];
-    document.querySelectorAll('.arr-tab').forEach((t, i) => {
-      t.classList.toggle('active', pages[i] === name);
-    });
-    document.querySelectorAll('.arr-page').forEach(p => p.classList.remove('active'));
-    document.getElementById('tab-' + name).classList.add('active');
-  }
-</script>
+<script>initNav(); hljs.highlightAll();</script>
 </body>
 </html>

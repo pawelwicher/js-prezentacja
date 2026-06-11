@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WeakMap, WeakSet, WeakRef | Techniki optymalizacyjne w JS</title>
+  <title>WeakMap / WeakRef | Techniki optymalizacyjne w JS</title>
   <link rel="stylesheet" href="../assets/github.min.css" />
   <script src="../assets/highlight.min.js"></script>
   <link rel="stylesheet" href="../style.css" />
@@ -12,118 +12,84 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">Optymalizacja JS — silnik V8</span>
+    <span class="title">optymalizacja-js</span>
     <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
     <span class="counter" id="counter"></span>
   </div>
 
   <div id="slide">
-    <h2>WeakMap, WeakSet, WeakRef</h2>
+    <h1>WeakMap / WeakRef</h1>
 
-    <!-- Trzy karty: WeakMap, WeakSet, WeakRef -->
-    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+    <div class="clue">
+      Klucz w <code>Map</code> <b>trzyma obiekt przy życiu</b> — cache na Mapie to gotowy wyciek.
+      <code>WeakMap</code> trzyma klucz <b>słabo</b>: gdy reszta kodu zapomni o obiekcie, GC zbiera go razem z wpisem.
+    </div>
 
-      <!-- WeakMap -->
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">WEAKMAP</div>
-        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
-          <div><strong>Klucze</strong> — wyłącznie obiekty (lub symbole non-registered); nie przyjmuje prymitywów</div>
-          <div><strong>Słabe referencje</strong> — klucz nie trzyma obiektu przy życiu; gdy obiekt nie ma innych referencji, GC może go zebrać razem z wpisem</div>
-          <div><strong>Brak iteracji</strong> — nie ma <code style="font-family:var(--mono);font-size:11px">.keys()</code>, <code style="font-family:var(--mono);font-size:11px">.values()</code>, <code style="font-family:var(--mono);font-size:11px">.size</code> — rozmiar jest z definicji nieznany (GC decyduje kiedy)</div>
-          <div><strong>API</strong> — <code style="font-family:var(--mono);font-size:11px">get / set / has / delete</code></div>
-          <div><strong>Użycie</strong> — prywatne dane powiązane z obiektem, cache bez wycieków pamięci</div>
+    <div class="grid-3">
+      <div class="panel">
+        <div class="ph">WeakMap / WeakSet</div>
+        <div class="pb">
+          <div>Klucze tylko obiekty; <b>brak iteracji i <code>.size</code></b> — rozmiar z definicji nieznany (GC decyduje)</div>
+          <div>Użycie: metadane obiektów spoza Twojej kontroli, cache, „czy już przetworzony?"</div>
         </div>
       </div>
-
-      <!-- WeakSet -->
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">WEAKSET</div>
-        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
-          <div><strong>Elementy</strong> — wyłącznie obiekty; zbiór unikalnych, słabych referencji</div>
-          <div><strong>Słabe referencje</strong> — gdy obiekt znika z reszty kodu, znika też z WeakSet automatycznie</div>
-          <div><strong>Brak iteracji</strong> — nie ma <code style="font-family:var(--mono);font-size:11px">.forEach</code>, <code style="font-family:var(--mono);font-size:11px">.size</code>, <code style="font-family:var(--mono);font-size:11px">[Symbol.iterator]</code></div>
-          <div><strong>API</strong> — <code style="font-family:var(--mono);font-size:11px">add / has / delete</code></div>
-          <div><strong>Użycie</strong> — oznaczanie obiektów (odwiedzone węzły grafu, przetworzone żądania) bez ryzyka wycieku</div>
+      <div class="panel">
+        <div class="ph">WeakRef + FinalizationRegistry</div>
+        <div class="pb">
+          <div><code>.deref()</code> → obiekt albo <code>undefined</code>, jeśli już zebrany</div>
+          <div>Spec celowo <b>nie gwarantuje kiedy</b> (ani czy) callback finalizacji się wykona</div>
         </div>
       </div>
-
-      <!-- WeakRef -->
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">WEAKREF + FINALIZATIONREGISTRY</div>
-        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:4px;">
-          <div><strong>WeakRef</strong> — opakowanie na obiekt; <code style="font-family:var(--mono);font-size:11px">.deref()</code> zwraca obiekt lub <code style="font-family:var(--mono);font-size:11px">undefined</code> jeśli już zebrany</div>
-          <div><strong>Bez gwarancji czasowych</strong> — GC może zebrać obiekt w dowolnym momencie po zniknięciu silnych referencji</div>
-          <div><strong>FinalizationRegistry</strong> — callback wywoływany po zebraniu obiektu; służy do sprzątania zasobów</div>
-          <div><strong>Uwaga</strong> — spec celowo nie gwarantuje kiedy ani czy callback w ogóle zostanie wywołany</div>
-          <div><strong>Użycie</strong> — opcjonalny cache (drogie obliczenia), obserwatory bez strong ref, zarządzanie zasobami zewnętrznymi</div>
+      <div class="panel">
+        <div class="ph bad">unikaj gdy…</div>
+        <div class="pb">
+          <div>…potrzebujesz iteracji, rozmiaru lub deterministycznego cyklu życia — wtedy zwykły <code>Map</code>/<code>Set</code> + jawne sprzątanie</div>
         </div>
       </div>
     </div>
 
-    <!-- Benchmark: wyciek pamięci -->
-    <div style="width:100%;margin-bottom:10px;">
-      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;">BENCHMARK — Map trzyma obiekty przy życiu, WeakMap nie</div>
-      <div class="bench-layout">
-        <div class="bench-panel">
-          <div class="bench-panel-header before">✗ &nbsp;Map — wyciek: obiekty nie mogą być zebrane przez GC</div>
-          <pre><code class="language-javascript">const cache = new Map();
-
-function processRequest(req) {
-  // Map trzyma silną referencję do `req`
-  // Nawet gdy caller wyzeruje swoją zmienną,
-  // obiekt żyje dopóki cache istnieje → wyciek
-  cache.set(req, expensiveCompute(req));
+    <div class="sec-label">demo — Map więzi obiekty, WeakMap nie</div>
+    <div class="bench-layout">
+      <div class="bench-panel">
+        <div class="bench-panel-header before">✗  Map — silna referencja do klucza</div>
+        <pre><code class="language-javascript">const cache = new Map();
+function process(req) {
+  cache.set(req, compute(req));
+  // req żyje dopóki żyje cache → wyciek
 }</code></pre>
-        </div>
-        <div class="bench-panel">
-          <div class="bench-panel-header after">✓ &nbsp;WeakMap — brak wycieku: GC zbiera obiekty gdy znikają</div>
-          <pre><code class="language-javascript">const cache = new WeakMap();
-
-function processRequest(req) {
-  // WeakMap trzyma słabą referencję do `req`
-  // Gdy caller wyzeruje zmienną → GC może
-  // zebrać `req` razem z wpisem w cache
-  cache.set(req, expensiveCompute(req));
+      </div>
+      <div class="bench-panel">
+        <div class="bench-panel-header after">✓  WeakMap — GC może zebrać klucz</div>
+        <pre><code class="language-javascript">const cache = new WeakMap();
+function process(req) {
+  cache.set(req, compute(req));
+  // caller porzuca req → GC zbiera req + wpis
 }</code></pre>
-        </div>
-      </div>
-
-      <div class="bench-run-row" style="margin-top:8px;margin-bottom:10px;">
-        <button class="run-btn" id="run-btn-1" onclick="runDemo()">▶ Uruchom demonstrację</button>
-        <span class="run-hint" id="hint-1">Tworzy 10 000 obiektów, usuwa referencje — FinalizationRegistry liczy ile GC zebrał.</span>
-      </div>
-
-      <div id="results-1">
-        <div class="results-grid">
-          <div class="result-card">
-            <div class="rc-label">Map — zebrane przez GC</div>
-            <div class="rc-value bad" id="r-map-gc">—</div>
-            <div class="rc-sub">obiekty nadal żyją w Map</div>
-          </div>
-          <div class="result-card">
-            <div class="rc-label">WeakMap — zebrane przez GC</div>
-            <div class="rc-value good" id="r-weak-gc">—</div>
-            <div class="rc-sub">GC mógł zwolnić pamięć</div>
-          </div>
-          <div class="result-card">
-            <div class="rc-label">Różnica</div>
-            <div class="rc-value highlight" id="r-diff">—</div>
-            <div class="rc-sub">obiektów uwięzionych w Map</div>
-          </div>
-        </div>
-        <div id="gc-note" style="font-size:11px;color:var(--muted);margin-top:4px;text-align:center;"></div>
       </div>
     </div>
-
-    <!-- Kiedy używać -->
-    <div style="width:100%;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-      <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">KIEDY UŻYWAĆ — reguła kciuka</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:10px 14px;gap:10px;font-size:12px;line-height:1.6;color:var(--text);">
-        <div><strong style="color:var(--green);">WeakMap</strong><br/>Dane prywatne lub metadane skojarzone z obiektem spoza Twojej kontroli (DOM node, instancja biblioteki)</div>
-        <div><strong style="color:var(--green);">WeakSet</strong><br/>Sprawdzanie "czy już przetworzony?" bez trzymania obiektu przy życiu</div>
-        <div><strong style="color:var(--green);">WeakRef</strong><br/>Cache drugiego poziomu — trzymaj wynik jeśli żyje, odtwórz gdy GC go zbierze</div>
-        <div><strong style="color:var(--red);">Unikaj gdy...</strong><br/>...potrzebujesz iteracji, pewnego rozmiaru lub deterministycznego cyklu życia — użyj Map/Set</div>
+    <div class="bench-run-row">
+      <button class="run-btn" id="run-btn-1" onclick="runDemo()">▶ run</button>
+      <span class="run-hint" id="hint-1">10 000 obiektów, FinalizationRegistry liczy, ile GC faktycznie zebrał.</span>
+    </div>
+    <div id="results-1" style="width:100%;">
+      <div class="results-grid">
+        <div class="result-card">
+          <div class="rc-label">Map — zebrane przez GC</div>
+          <div class="rc-value bad" id="r-map-gc">—</div>
+          <div class="rc-sub">obiekty nadal żyją w Map</div>
+        </div>
+        <div class="result-card">
+          <div class="rc-label">WeakMap — zebrane przez GC</div>
+          <div class="rc-value good" id="r-weak-gc">—</div>
+          <div class="rc-sub">GC mógł zwolnić pamięć</div>
+        </div>
+        <div class="result-card">
+          <div class="rc-label">różnica</div>
+          <div class="rc-value highlight" id="r-diff">—</div>
+          <div class="rc-sub">obiektów uwięzionych w Map</div>
+        </div>
       </div>
+      <div id="gc-note" style="font-size:11.5px;color:var(--muted);margin-top:4px;text-align:center;"></div>
     </div>
 
   </div>
@@ -144,7 +110,7 @@ function processRequest(req) {
     const btn  = document.getElementById('run-btn-1');
     const hint = document.getElementById('hint-1');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa demonstracja…';
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; demonstracja…';
     hint.textContent = '';
 
     const N = 10_000;
@@ -190,17 +156,13 @@ function processRequest(req) {
     const mapStillAlive  = N - mapCollected;   // Map trzyma wszystkie
     const weakStillAlive = N - weakCollected;   // WeakMap pozwolił zebrać
 
-    document.getElementById('r-map-gc').textContent  = mapCollected === 0
-      ? `0 / ${N}` : `${mapCollected} / ${N}`;
-    document.getElementById('r-weak-gc').textContent = weakCollected === 0
-      ? `0 / ${N}` : `${weakCollected} / ${N}`;
+    document.getElementById('r-map-gc').textContent  = `${mapCollected} / ${N}`;
+    document.getElementById('r-weak-gc').textContent = `${weakCollected} / ${N}`;
     document.getElementById('r-diff').textContent = `${mapStillAlive - weakStillAlive} obj`;
-
-    document.getElementById('results-1').classList.add('visible');
 
     const note = document.getElementById('gc-note');
     if (weakCollected === 0) {
-      note.textContent = 'GC jeszcze nie zadziałał — FinalizationRegistry jest niedeterministyczny. Uruchom ponownie lub otwórz DevTools → Memory → "Collect garbage".';
+      note.textContent = 'GC jeszcze nie zadziałał — FinalizationRegistry jest niedeterministyczny. Uruchom ponownie lub DevTools → Memory → "Collect garbage".';
     } else {
       note.textContent = `GC zebrał ${weakCollected} obiektów z WeakMap. Map nadal trzyma wszystkie ${N} — to jest wyciek.`;
     }
@@ -209,7 +171,7 @@ function processRequest(req) {
     strongMap.clear();
 
     btn.disabled = false;
-    btn.innerHTML = '↺ Uruchom ponownie';
+    btn.innerHTML = '↺ ponownie';
     hint.textContent = 'Wyniki zależą od harmonogramu GC — mogą się różnić.';
   }
 </script>

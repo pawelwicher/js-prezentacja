@@ -8,194 +8,149 @@
   <style>
     .toc-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
       width: 100%;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
     }
     .toc-card {
-      border-right: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 10px 14px;
       text-decoration: none;
-      color: var(--text);
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      transition: background 150ms;
+      gap: 2px;
+      transition: border-color 150ms;
     }
-    .toc-card:nth-child(4n)         { border-right: none; }
-    .toc-card:nth-last-child(-n+4)  { border-bottom: none; }
-    /* ostatni rząd może mieć mniej niż 4 — usuń border-bottom dla wszystkich w nim */
-    .toc-card:last-child            { border-right: none; }
-    .toc-card:hover { background: var(--accent-light); }
+    .toc-card:hover { border-color: var(--accent); }
+    .toc-num { font-family: var(--mono); font-size: 10px; color: var(--muted); }
     .toc-card:hover .toc-num { color: var(--accent); }
-    .toc-num {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-      letter-spacing: .04em;
-    }
-    .toc-label {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text);
-      line-height: 1.3;
-    }
-    .toc-desc {
-      font-size: 11px;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-    .toc-badge {
-      display: inline-block;
-      font-size: 9px;
-      font-weight: 700;
-      padding: 1px 5px;
-      border-radius: 3px;
-      margin-top: 3px;
-      align-self: flex-start;
-    }
-    .badge-bench  { background: #dbeafe; color: #1d4ed8; }
-    .badge-theory { background: #f3f4f6; color: #6b7280; }
-    .badge-mixed  { background: #ede9fe; color: #6d28d9; }
-    .badge-sum    { background: #fef9c3; color: #854d0e; }
+    .toc-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .toc-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+    .toc-bench { color: var(--muted); font-family: var(--mono); font-size: 10px; font-weight: 700; }
   </style>
 </head>
 <body>
 <div id="app">
 
   <div id="topbar">
-    <span class="title">Optymalizacja JS — silnik V8</span>
+    <span class="title">optymalizacja-js</span>
     <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
     <span class="counter" id="counter"></span>
   </div>
 
   <div id="slide">
-    <h1>Spis treści</h1>
+    <h1>spis treści</h1>
 
     <div class="toc-grid">
 
       <a class="toc-card" href="02-wstep.html">
         <span class="toc-num">02</span>
         <span class="toc-label">Wstęp</span>
-        <span class="toc-desc">co i kiedy optymalizować · Knuth · DevTools</span>
-        <span class="toc-badge badge-theory">teoria</span>
+        <span class="toc-desc">co optymalizować i kiedy · Knuth</span>
       </a>
 
       <a class="toc-card" href="03-pamiec.html">
         <span class="toc-num">03</span>
-        <span class="toc-label">Zarządzanie pamięcią</span>
-        <span class="toc-desc">stos · sterta · mark-and-sweep · GC generacyjny · wycieki</span>
-        <span class="toc-badge badge-theory">teoria</span>
+        <span class="toc-label">Pamięć i GC</span>
+        <span class="toc-desc">stos · sterta · GC generacyjny · wycieki</span>
       </a>
 
       <a class="toc-card" href="04-kompilacjav8.html">
         <span class="toc-num">04</span>
         <span class="toc-label">Kompilacja V8</span>
-        <span class="toc-desc">Ignition → Sparkplug → Maglev → TurboFan · feedback vector</span>
-        <span class="toc-badge badge-theory">teoria</span>
+        <span class="toc-desc">Ignition → Sparkplug → Maglev → TurboFan</span>
       </a>
 
       <a class="toc-card" href="05-liczby.html">
         <span class="toc-num">05</span>
-        <span class="toc-label">Liczby w JS</span>
-        <span class="toc-desc">IEEE 754 · SMI · HeapNumber · tagged pointers · boxing</span>
-        <span class="toc-badge badge-theory">teoria</span>
+        <span class="toc-label">Liczby</span>
+        <span class="toc-desc">IEEE 754 · Smi vs HeapNumber</span>
       </a>
 
-      <a class="toc-card" href="06-tablice.html">
-        <span class="toc-num">06</span>
-        <span class="toc-label">Tablice w V8</span>
-        <span class="toc-desc">elements kinds · PACKED vs HOLEY · degradacja · %DebugPrint</span>
-        <span class="toc-badge badge-theory">teoria</span>
+      <a class="toc-card" href="06-stringi.html">
+        <span class="toc-num">06 <span class="toc-bench">[bench]</span></span>
+        <span class="toc-label">Stringi</span>
+        <span class="toc-desc">rope · sliced · internalizacja · += vs join</span>
       </a>
 
-      <a class="toc-card" href="07-setandarray.html">
+      <a class="toc-card" href="07-tablice.html">
         <span class="toc-num">07</span>
+        <span class="toc-label">Tablice — elements kinds</span>
+        <span class="toc-desc">PACKED vs HOLEY · jednokierunkowa degradacja</span>
+      </a>
+
+      <a class="toc-card" href="08-setandarray.html">
+        <span class="toc-num">08 <span class="toc-bench">[bench]</span></span>
         <span class="toc-label">Set vs Array</span>
-        <span class="toc-desc">has() O(1) vs includes() O(n) · deduplikacja</span>
-        <span class="toc-badge badge-bench">benchmark</span>
+        <span class="toc-desc">has() O(1) vs includes() O(n)</span>
       </a>
 
-      <a class="toc-card" href="08-mapandobject.html">
-        <span class="toc-num">08</span>
+      <a class="toc-card" href="09-mapandobject.html">
+        <span class="toc-num">09 <span class="toc-bench">[bench]</span></span>
         <span class="toc-label">Map vs Object</span>
-        <span class="toc-desc">rotacja kluczy · iteracja · dictionary mode</span>
-        <span class="toc-badge badge-bench">benchmark</span>
+        <span class="toc-desc">rotacja kluczy · dictionary mode</span>
       </a>
 
-      <a class="toc-card" href="09-numberarrays.html">
-        <span class="toc-num">09</span>
-        <span class="toc-label">Elements Kinds</span>
-        <span class="toc-desc">PACKED_SMI vs HOLEY vs DICTIONARY · porównanie 7 wariantów</span>
-        <span class="toc-badge badge-bench">benchmark</span>
+      <a class="toc-card" href="10-numberarrays.html">
+        <span class="toc-num">10 <span class="toc-bench">[bench]</span></span>
+        <span class="toc-label">Elements kinds w praktyce</span>
+        <span class="toc-desc">7 wariantów tablic — pomiar odczytu</span>
       </a>
 
-      <a class="toc-card" href="10-hiddenclasses.html">
-        <span class="toc-num">10</span>
-        <span class="toc-label">Hidden Classes</span>
-        <span class="toc-desc">mono / poly / megamorphic IC · co niszczy kształt</span>
-        <span class="toc-badge badge-bench">benchmark</span>
+      <a class="toc-card" href="11-hiddenclasses.html">
+        <span class="toc-num">11 <span class="toc-bench">[bench]</span></span>
+        <span class="toc-label">Hidden classes</span>
+        <span class="toc-desc">mono / poly / megamorphic IC</span>
       </a>
 
-      <a class="toc-card" href="11-deopt.html">
-        <span class="toc-num">11</span>
-        <span class="toc-label">Deoptymalizacja funkcji</span>
-        <span class="toc-desc">argumenty różnych typów · bailout · IC states</span>
-        <span class="toc-badge badge-bench">benchmark</span>
+      <a class="toc-card" href="12-deopt.html">
+        <span class="toc-num">12 <span class="toc-bench">[bench]</span></span>
+        <span class="toc-label">Deoptymalizacja</span>
+        <span class="toc-desc">kształty argumentów funkcji</span>
       </a>
 
-      <a class="toc-card" href="12-weakmap.html">
-        <span class="toc-num">12</span>
+      <a class="toc-card" href="13-weakmap.html">
+        <span class="toc-num">13 <span class="toc-bench">[demo]</span></span>
         <span class="toc-label">WeakMap / WeakRef</span>
-        <span class="toc-desc">słabe referencje · cache bez wycieku · FinalizationRegistry</span>
-        <span class="toc-badge badge-theory">teoria</span>
+        <span class="toc-desc">cache bez wycieków pamięci</span>
       </a>
 
-      <a class="toc-card" href="13-clone.html">
-        <span class="toc-num">13</span>
-        <span class="toc-label">Klonowanie obiektów</span>
-        <span class="toc-desc">spread · Object.assign · JSON · structuredClone</span>
-        <span class="toc-badge badge-bench">benchmark</span>
+      <a class="toc-card" href="14-clone.html">
+        <span class="toc-num">14 <span class="toc-bench">[bench]</span></span>
+        <span class="toc-label">Klonowanie</span>
+        <span class="toc-desc">spread · JSON · structuredClone</span>
       </a>
 
-      <a class="toc-card" href="14-arraybuffer.html">
-        <span class="toc-num">14</span>
-        <span class="toc-label">TypedArray</span>
-        <span class="toc-desc">ArrayBuffer · zużycie pamięci · subarray zero-copy</span>
-        <span class="toc-badge badge-mixed">teoria + dane</span>
-      </a>
-
-      <a class="toc-card" href="15-objectpool.html">
+      <a class="toc-card" href="15-arraybuffer.html">
         <span class="toc-num">15</span>
-        <span class="toc-label">Object Pooling</span>
-        <span class="toc-desc">zero alokacji w hot path · redukcja GC pauses</span>
-        <span class="toc-badge badge-bench">benchmark</span>
+        <span class="toc-label">TypedArray</span>
+        <span class="toc-desc">4–32× mniej pamięci · subarray zero-copy</span>
       </a>
 
-      <a class="toc-card" href="16-workers.html">
-        <span class="toc-num">16</span>
-        <span class="toc-label">Web Workers</span>
-        <span class="toc-desc">izolacja sterty · transferables · SharedArrayBuffer</span>
-        <span class="toc-badge badge-theory">teoria</span>
+      <a class="toc-card" href="16-objectpool.html">
+        <span class="toc-num">16 <span class="toc-bench">[bench]</span></span>
+        <span class="toc-label">Object pooling</span>
+        <span class="toc-desc">zero alokacji w hot path</span>
       </a>
 
-      <a class="toc-card" href="17-profiling.html">
+      <a class="toc-card" href="17-workers.html">
         <span class="toc-num">17</span>
-        <span class="toc-label">Profiling w praktyce</span>
-        <span class="toc-desc">flame graph · timeline · memory panel · Performance API</span>
-        <span class="toc-badge badge-theory">przewodnik</span>
+        <span class="toc-label">Web Workers</span>
+        <span class="toc-desc">izolacja sterty · transferables</span>
       </a>
 
-      <a class="toc-card" href="18-podsumowanie.html">
+      <a class="toc-card" href="18-profiling.html">
         <span class="toc-num">18</span>
+        <span class="toc-label">Profiling</span>
+        <span class="toc-desc">DevTools Performance · Performance API</span>
+      </a>
+
+      <a class="toc-card" href="19-podsumowanie.html">
+        <span class="toc-num">19</span>
         <span class="toc-label">Podsumowanie</span>
-        <span class="toc-desc">cheat sheet · mity wydajnościowe · złota zasada</span>
-        <span class="toc-badge badge-sum">podsumowanie</span>
+        <span class="toc-desc">cheat sheet · mity wydajnościowe</span>
       </a>
 
     </div>

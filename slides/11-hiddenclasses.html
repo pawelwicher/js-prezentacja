@@ -3,256 +3,98 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hidden Classes | Techniki optymalizacyjne w JS</title>
+  <title>Hidden classes | Techniki optymalizacyjne w JS</title>
   <link rel="stylesheet" href="../assets/github.min.css" />
   <script src="../assets/highlight.min.js"></script>
   <link rel="stylesheet" href="../style.css" />
   <style>
-    .hc-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
-    .hc-table th {
-      background: var(--surface);
-      color: var(--muted);
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      padding: 7px 12px;
-      border-bottom: 1px solid var(--border);
-      text-align: left;
-    }
-    .hc-table th.num { text-align: right; }
-    .hc-table td {
-      padding: 6px 12px;
-      border-bottom: 1px solid var(--border);
-      color: var(--text);
-      vertical-align: top;
-    }
-    .hc-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12px; }
-    .hc-table tr:last-child td { border-bottom: none; }
-    .hc-table tr:hover td { background: #f9fafb; }
-    .hc-kind { font-weight: 700; font-family: var(--mono); font-size: 12px; }
+    .hc-kind { font-weight: 700; font-family: var(--mono); font-size: 12px; color: var(--text); }
     .hc-desc { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
-    .hc-bar-wrap { width: 80px; height: 6px; background: var(--border); border-radius: 999px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
+    .hc-bar-wrap { width: 80px; height: 5px; background: var(--surface-2); border-radius: 999px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
     .hc-bar-fill { height: 100%; border-radius: 999px; }
-    .val-best   { color: var(--green); font-weight: 700; }
-    .val-slow   { color: var(--red); }
+    .val-best   { color: var(--text); font-weight: 700; }
+    .val-slow   { color: var(--muted); }
     .val-normal { color: var(--text); }
     #hc-results { display: none; width: 100%; }
     #hc-results.visible { display: block; }
-
-    .ic-grid {
-      width: 100%;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-    }
-    .ic-card {
-      border-radius: var(--radius);
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
-    .ic-card-header {
-      padding: 8px 14px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: .03em;
-    }
-    .ic-card-body {
-      padding: 10px 14px;
-      font-size: 12px;
-      line-height: 1.65;
-      color: var(--muted);
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-    .ic-card-body strong { color: var(--text); }
-    .ic-badge {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 999px;
-      margin-bottom: 4px;
-    }
   </style>
 </head>
 <body>
 <div id="app">
 
   <div id="topbar">
-    <span class="title">Optymalizacja JS — silnik V8</span>
+    <span class="title">optymalizacja-js</span>
     <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
     <span class="counter" id="counter"></span>
   </div>
 
   <div id="slide" style="min-height:0;">
-    <h2>Jak V8 śledzi kształt obiektów</h2>
+    <h1>hidden classes</h1>
 
-    <!-- Teoria -->
-    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">CO TO JEST HIDDEN CLASS (MAP)</div>
-        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:5px;">
-          <div>V8 nie przechowuje nazw właściwości w każdym obiekcie. Zamiast tego tworzy wewnętrzną strukturę <strong>Hidden Class</strong> (w kodzie V8 nazywana <em>Map</em>), która opisuje <em>kształt</em> obiektu: jakie pola istnieją i pod jakim offsetem w pamięci.</div>
-          <div>Obiekty o identycznym zestawie pól (dodawanych w tej samej kolejności) <strong>współdzielą jedną Hidden Class</strong>. Dostęp do pola to wtedy proste przesunięcie w pamięci — jak w struct w C.</div>
-          <div><strong>Inline Cache (IC)</strong> — przy każdym odczycie <code style="font-family:var(--mono);font-size:11px">obj.x</code> V8 zapamiętuje Hidden Class obiektu i kompiluje bezpośredni skok. Następne wywołanie z tym samym kształtem trafia w gotowy kod maszynowy.</div>
-          <div><strong>Megamorphic ≠ deopt</strong> — zmiana stanu IC (mono→poly→mega) tylko obniża stopień specjalizacji dostępu. <em>Deoptymalizacja</em> to osobne zdarzenie: zoptymalizowany kod TurboFana trafia na nieoczekiwany kształt, zostaje odrzucony i wykonanie wraca do interpretera.</div>
-        </div>
+    <div class="clue">
+      V8 opisuje <b>kształt obiektu</b> ukrytą klasą (Map): jakie pola, pod jakim offsetem.
+      Obiekty o tym samym kształcie współdzielą ją, a <b>inline cache</b> zamienia <code>obj.x</code> w odczyt spod stałego offsetu — jak struct w C.
+      Im więcej kształtów widzi jedno miejsce w kodzie, tym wolniej.
+    </div>
+
+    <div class="grid-3">
+      <div class="panel">
+        <div class="ph ok">monomorphic — 1 kształt</div>
+        <div class="pb"><div>Stały offset, zero lookupów. <b>Cel każdego hot patha.</b></div></div>
       </div>
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="background:var(--surface);color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;letter-spacing:.03em;border-bottom:1px solid var(--border);">CO NISZCZY HIDDEN CLASS</div>
-        <div style="padding:10px 14px;font-size:12px;line-height:1.7;color:var(--text);display:flex;flex-direction:column;gap:5px;">
-          <div><strong>Różna kolejność właściwości</strong> — <code style="font-family:var(--mono);font-size:11px">{x,y}</code> i <code style="font-family:var(--mono);font-size:11px">{y,x}</code> to dwie różne Hidden Classes, mimo tych samych pól.</div>
-          <div><strong>Dynamiczne dodawanie pól</strong> — każde <code style="font-family:var(--mono);font-size:11px">obj.newProp = …</code> po stworzeniu obiektu tworzy nową Hidden Class (transition chain).</div>
-          <div><strong>delete obj.prop</strong> — usuwa pole i może zdegradować obiekt do trybu słownikowego (jak DICTIONARY dla tablic).</div>
-          <div><strong>Warunkowo inicjowane pola</strong> — gdy część obiektów ma pole <code style="font-family:var(--mono);font-size:11px">extra</code> a część nie, IC staje się polymorphic i V8 generuje wolniejszy kod.</div>
-          <div style="padding:4px 8px;background:var(--green-light);border-radius:4px;color:var(--green);font-weight:600;">Reguła: inicjuj wszystkie pola w konstruktorze, zawsze w tej samej kolejności.</div>
-        </div>
+      <div class="panel">
+        <div class="ph warn">polymorphic — 2–4 kształty</div>
+        <div class="pb"><div>IC porównuje kształt z krótką listą. Wolniej, ale JIT nadal działa.</div></div>
+      </div>
+      <div class="panel">
+        <div class="ph bad">megamorphic — &gt;4 kształtów</div>
+        <div class="pb"><div>IC się poddaje → generyczny lookup, koniec inliningu <b>(ale to nie deopt)</b>.</div></div>
       </div>
     </div>
 
-    <!-- Mono / Poly / Mega -->
-    <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;align-self:flex-start;">STANY INLINE CACHE — co widzi V8 przy każdym wywołaniu</div>
-    <div class="ic-grid">
-      <div class="ic-card">
-        <div class="ic-card-header" style="background:#f0fdf4;color:#15803d;border-bottom:1px solid #bbf7d0;">
-          Monomorphic
-        </div>
-        <div class="ic-card-body">
-          <div><span class="ic-badge" style="background:#dcfce7;color:#15803d;">1 Hidden Class</span></div>
-          <div>IC widział <strong>zawsze ten sam kształt</strong>. V8 JIT kompiluje dostęp do pola jako stały offset w pamięci — zero lookupów, kod jak w C.</div>
-          <div><strong>Próg:</strong> jeden kształt przez cały czas życia call-site.</div>
-        </div>
-      </div>
-      <div class="ic-card">
-        <div class="ic-card-header" style="background:#fffbeb;color:#d97706;border-bottom:1px solid #fde68a;">
-          Polymorphic
-        </div>
-        <div class="ic-card-body">
-          <div><span class="ic-badge" style="background:#fef3c7;color:#d97706;">2–4 Hidden Classes</span></div>
-          <div>IC widział <strong>kilka różnych kształtów</strong>. V8 generuje krótką listę sprawdzeń (IC stub): porównuje HC obiektu z każdym zapamiętanym — pierwsze trafienie wygrywa.</div>
-          <div><strong>Próg V8:</strong> do 4 kształtów. Wolniejsze od mono, ale JIT nadal działa.</div>
-        </div>
-      </div>
-      <div class="ic-card">
-        <div class="ic-card-header" style="background:#fef2f2;color:#dc2626;border-bottom:1px solid #fecaca;">
-          Megamorphic
-        </div>
-        <div class="ic-card-body">
-          <div><span class="ic-badge" style="background:#fee2e2;color:#dc2626;">&gt; 4 Hidden Classes</span></div>
-          <div>IC się poddał — <strong>zbyt wiele różnych kształtów</strong>. V8 przełącza się na generyczny property lookup (runtime, bez specjalizacji JIT). Każdy dostęp do pola idzie przez słownik kształtów.</div>
-          <div><strong>Skutek:</strong> deoptymalizacja hot patha, znaczny spadek wydajności.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Przykłady kodu -->
-    <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;align-self:flex-start;">PRZYKŁADY — dobre vs złe wzorce</div>
-    <div class="bench-layout">
+    <div class="grid-2">
       <div class="bench-panel">
-        <div class="bench-panel-header before">✗ &nbsp;Niszczy Hidden Class</div>
-        <pre><code class="language-javascript">// 1. Różna kolejność pól → różne Hidden Classes
-const a = { x: 1, y: 2 }; // HC1: {x, y}
-const b = { y: 2, x: 1 }; // HC2: {y, x} — inna HC!
-
-// 2. Dodawanie pól po stworzeniu → transition chain
-function Point(x, y) { this.x = x; this.y = y; }
-// new Point → HC0: {} → HC1: {x} → HC2: {x,y}
-const p = new Point(1, 2); // HC2
-p.z = 3; // transition → HC3: {x,y,z}
-
-// 3. delete niszczy Hidden Class
-delete p.x; // HC3 → slow properties (dict mode)</code></pre>
+        <div class="bench-panel-header before">✗  niszczy kształt</div>
+        <pre><code class="language-javascript">const a = { x: 1, y: 2 };  // HC1
+const b = { y: 2, x: 1 };  // HC2 — inna kolejność!
+p.z = 3;                   // pole po konstrukcji → nowa HC
+delete p.x;                // → dictionary mode</code></pre>
       </div>
       <div class="bench-panel">
-        <div class="bench-panel-header after">✓ &nbsp;Zachowuje Hidden Class</div>
-        <pre><code class="language-javascript">// 1. Stała kolejność pól → jedna Hidden Class
-const a = { x: 1, y: 2 }; // HC1: {x, y}
-const b = { x: 9, y: 7 }; // HC1: {x, y} — ta sama ✓
-
-// 2. Wszystkie pola w konstruktorze → brak transition
-function Point(x, y) {
+        <div class="bench-panel-header after">✓  zachowuje kształt</div>
+        <pre><code class="language-javascript">function Point(x, y) {
   this.x = x; this.y = y;
-  this.z = 0; // zawsze — HC kończy się na HC3 ✓
-}
-// new Point → HC0 → HC1 → HC2 → HC3 (raz, przy JIT)
-const p = new Point(1, 2); // HC3: {x,y,z}
-p.z = 3; // aktualizacja wartości, nie transition ✓
-
-// 3. null zamiast delete — HC nienaruszona
-obj.cache = null; // nadal HC z polem cache ✓</code></pre>
+  this.z = 0;       // wszystkie pola w konstruktorze,
+}                   // zawsze ta sama kolejność
+obj.cache = null;   // null zamiast delete</code></pre>
       </div>
     </div>
 
-    <!-- Benchmark -->
-    <div style="width:100%;">
-      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.04em;">BENCHMARK — sumowanie właściwości, N = 500 000 iteracji, 30 powtórzeń</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
-        <div class="bench-panel">
-          <div class="bench-panel-header after">✓ &nbsp;Monomorphic — 1 HC</div>
-          <pre><code class="language-javascript">// Każdy obiekt ma dokładnie 3 pola:
-// x, y, tag — zawsze ta sama nazwa
-for (let i = 0; i < N; i++) {
-  objs.push({ x: i, y: i*2, tag: 0 });
-}
-// → jedna HC → V8 JIT kompiluje
-//   stały offset dla .x i .y</code></pre>
-        </div>
-        <div class="bench-panel">
-          <div class="bench-panel-header" style="background:#fffbeb;color:#d97706;">~ &nbsp;Polymorphic — 4 HC</div>
-          <pre><code class="language-javascript">// 4 różne kształty: tag0..tag3
-// IC trzyma stub z 4 sprawdzeniami
-for (let i = 0; i < N; i++) {
-  objs.push({
-    x: i, y: i*2,
-    ['tag'+(i%4)]: 0
-  });
-}
-// → JIT nadal działa, ale wolniej</code></pre>
-        </div>
-        <div class="bench-panel">
-          <div class="bench-panel-header before">✗ &nbsp;Megamorphic — 32 HC</div>
-          <pre><code class="language-javascript">// 32 różne kształty: tag0..tag31
-// IC się poddaje — generic lookup
-for (let i = 0; i < N; i++) {
-  objs.push({
-    x: i, y: i*2,
-    ['tag'+(i%32)]: 0
-  });
-}
-// → każdy o.x i o.y przez słownik</code></pre>
-        </div>
-      </div>
+    <div class="sec-label">benchmark — suma .x + .y po 500 000 obiektów</div>
+    <div class="bench-run-row">
+      <button class="run-btn" id="run-btn" onclick="runBenchmark()">▶ run</button>
+      <span class="run-hint" id="run-hint">1 vs 4 vs 32 hidden classes — ten sam kod odczytu.</span>
+    </div>
 
-      <div class="bench-run-row" style="margin-bottom:12px;">
-        <button class="run-btn" id="run-btn" onclick="runBenchmark()">▶ Uruchom benchmark</button>
-        <span class="run-hint" id="run-hint">Stały kształt vs 32 różne Hidden Classes — różnica w dostępie do tych samych pól.</span>
+    <div id="hc-results">
+      <div class="panel" style="width:100%;">
+        <table class="t">
+          <thead>
+            <tr>
+              <th style="width:36%">wariant</th>
+              <th class="num" style="width:11%">avg (ms)</th>
+              <th class="num" style="width:9%">min</th>
+              <th class="num" style="width:9%">max</th>
+              <th style="width:35%">względnie</th>
+            </tr>
+          </thead>
+          <tbody id="hc-tbody"></tbody>
+        </table>
       </div>
-
-      <div id="hc-results">
-        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-          <table class="hc-table">
-            <thead>
-              <tr>
-                <th style="width:36%">Wariant</th>
-                <th class="num" style="width:11%">Średnia (ms)</th>
-                <th class="num" style="width:9%">Min</th>
-                <th class="num" style="width:9%">Max</th>
-                <th style="width:35%">Względnie</th>
-              </tr>
-            </thead>
-            <tbody id="hc-tbody"></tbody>
-          </table>
-        </div>
-        <p style="font-size:12px;color:var(--muted);margin-top:8px;align-self:flex-start;">
-          Wyniki zależą od przeglądarki i wersji V8. Różnice mogą być większe na zimnym cache.
-        </p>
-      </div>
+      <p style="font-size:11.5px;color:var(--muted);margin-top:8px;">
+        Każdy wariant ma osobną funkcję sumującą (własny inline cache) — jedna wspólna mieszałaby kształty
+        i nie pokazałaby efektu mono/poly/megamorphic.
+      </p>
     </div>
 
   </div>
@@ -274,9 +116,9 @@ for (let i = 0; i < N; i++) {
   const RUNS = 40;
 
   const META = {
-    'Monomorphic':  { desc: '1 Hidden Class — V8 JIT kompiluje .x i .y jako stały offset w pamięci. Brak lookupów.' },
-    'Polymorphic':  { desc: '4 Hidden Classes — IC trzyma stub z 4 sprawdzeniami kształtu. JIT nadal działa, ale wolniej niż mono.' },
-    'Megamorphic':  { desc: '32 różne Hidden Classes — IC odpada, każdy dostęp do .x i .y to generyczny property lookup.' },
+    'Monomorphic':  { desc: '1 hidden class — JIT kompiluje .x i .y jako stały offset w pamięci. Brak lookupów.' },
+    'Polymorphic':  { desc: '4 hidden classes — IC trzyma stub z 4 sprawdzeniami kształtu. Wolniej niż mono.' },
+    'Megamorphic':  { desc: '32 hidden classes — IC odpada, każdy dostęp to generyczny property lookup.' },
   };
 
   function makeMonoArr() {
@@ -348,7 +190,7 @@ for (let i = 0; i < N; i++) {
     const btn  = document.getElementById('run-btn');
     const hint = document.getElementById('run-hint');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; pomiar…';
     hint.textContent = '';
 
     await new Promise(r => setTimeout(r, 60));
@@ -390,7 +232,7 @@ for (let i = 0; i < N; i++) {
 
     document.getElementById('hc-results').classList.add('visible');
     btn.disabled = false;
-    btn.innerHTML = '↺ Uruchom ponownie';
+    btn.innerHTML = '↺ ponownie';
     hint.textContent = 'Wyniki mogą się nieznacznie różnić między uruchomieniami.';
   }
 </script>

@@ -5,182 +5,52 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wstęp | Techniki optymalizacyjne w JS</title>
   <link rel="stylesheet" href="../style.css" />
-  <style>
-    .two-col {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      width: 100%;
-    }
-    .section-panel {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      background: var(--surface);
-    }
-    .section-panel-header {
-      padding: 10px 16px;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .07em;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .section-panel-header.speed  { background: var(--accent-light); color: var(--accent); }
-    .section-panel-header.memory { background: var(--yellow-light);  color: var(--yellow); }
-    .section-panel-body {
-      padding: 14px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .item {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .item-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .item-desc {
-      font-size: 12.5px;
-      color: var(--muted);
-      line-height: 1.55;
-    }
-    .item-desc code {
-      font-family: var(--mono);
-      font-size: 11.5px;
-      background: #f3f4f6;
-      padding: 1px 5px;
-      border-radius: 4px;
-    }
-    .tip-bar {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 18px;
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-    }
-    .tip-bar .tip-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-    .tip-bar .tip-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
-    .tip-bar .tip-text strong { color: var(--text); }
-  </style>
 </head>
 <body>
 <div id="app">
 
   <div id="topbar">
-    <span class="title">Optymalizacja JS — silnik V8</span>
+    <span class="title">optymalizacja-js</span>
     <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
     <span class="counter" id="counter"></span>
   </div>
 
   <div id="slide">
-    <h1>Wstęp</h1>
+    <h1>wstęp</h1>
 
-    <div class="two-col">
-
-      <!-- Szybkość -->
-      <div class="section-panel">
-        <div class="section-panel-header speed">⚡ Szybkość działania</div>
-        <div class="section-panel-body">
-          <div class="item">
-            <span class="item-title">Złożoność algorytmiczna</span>
-            <span class="item-desc">Największe zyski. Zagnieżdżone pętle O(n²) na dużych danych potrafią zabić wydajność. <code>Map</code> / <code>Set</code> (O(1)) zamiast <code>Array.includes</code> / <code>indexOf</code> (O(n)).</span>
-          </div>
-          <div class="item">
-            <span class="item-title">Operacje na DOM</span>
-            <span class="item-desc">Drogie — batchuj zmiany, buduj poza DOM-em i wstawiaj raz. Unikaj mieszania odczytu właściwości wymuszających reflow (<code>offsetHeight</code>, <code>getBoundingClientRect</code>) z zapisami.</span>
-          </div>
-          <div class="item">
-            <span class="item-title">Pętle i metody tablicowe</span>
-            <span class="item-desc"><code>for</code> jest zwykle szybszy niż <code>forEach</code> / <code>map</code>. Łańcuchy <code>.filter().map().reduce()</code> iterują tablicę wielokrotnie — przy dużych zbiorach lepsza jest jedna pętla.</span>
-          </div>
-          <div class="item">
-            <span class="item-title">Asynchroniczność</span>
-            <span class="item-desc"><code>Promise.all()</code> zamiast sekwencyjnego <code>await</code> w pętli gdy operacje są niezależne. Ciężkie obliczenia synchroniczne — przenieś do Web Workera.</span>
-          </div>
-          <div class="item">
-            <span class="item-title">Debounce / throttle</span>
-            <span class="item-desc">Dla zdarzeń <code>scroll</code>, <code>resize</code>, <code>input</code> — ogranicza liczbę wywołań handlera.</span>
-          </div>
-          <div class="item">
-            <span class="item-title">JIT-friendly kod</span>
-            <span class="item-desc">V8 lubi obiekty o stałym kształcie (monomorficzne). Dodawanie i usuwanie pól w hot pathach degraduje wydajność przez deoptymalizację.</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Pamięć -->
-      <div class="section-panel">
-        <div class="section-panel-header memory">🧠 Zużycie pamięci</div>
-        <div class="section-panel-body">
-          <div class="item">
-            <span class="item-title">Wycieki pamięci</span>
-            <span class="item-desc">Listenery niewyrejestrowane przy usuwaniu elementu, <code>setInterval</code> trzymający referencje, closures trzymające duże obiekty, przypadkowe zmienne globalne, detached DOM nodes.</span>
-          </div>
-          <div class="item">
-            <span class="item-title">Struktury danych</span>
-            <span class="item-desc"><code>WeakMap</code> / <code>WeakSet</code> gdy klucze mogą być garbage-collected. <code>Map</code> jest pamięciowo cięższy niż zwykły obiekt, ale szybszy przy częstych dodawaniach/usuwaniach.</span>
-          </div>
-          <div class="item">
-            <span class="item-title">Kopiowanie vs mutacja</span>
-            <span class="item-desc">Podejście niemutowalne (<code>{...obj}</code>, <code>[...arr]</code>) jest czyste, ale generuje dużo śmieci. W hot pathach czasem warto mutować lokalnie.</span>
-          </div>
-          <div class="item">
-            <span class="item-title">Stringi i konkatenacja</span>
-            <span class="item-desc">Przy budowaniu długich stringów w pętli <code>array.join('')</code> jest bezpieczniejszy niż <code>+=</code>.</span>
-          </div>
-          <div class="item">
-            <span class="item-title">TypedArray</span>
-            <span class="item-desc"><code>Float32Array</code>, <code>Uint8Array</code> — dużo bardziej kompaktowe niż zwykłe <code>Array</code> przy danych liczbowych.</span>
-          </div>
-          <div class="item">
-            <span class="item-title">Streaming</span>
-            <span class="item-desc">Przy dużych plikach / odpowiedziach API — streamy zamiast wczytywania wszystkiego do pamięci naraz.</span>
-          </div>
-        </div>
-      </div>
-
+    <div class="clue">
+      <b>Najpierw zmierz, potem optymalizuj.</b> Największe zyski daje algorytm i struktura danych —
+      mikro-optymalizacje pod JIT mają sens tylko w zmierzonych hot pathach.
     </div>
 
-    <div style="width:100%;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-      <div style="background:var(--accent-light);color:var(--accent);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:10px 18px;border-bottom:1px solid var(--border);">
-        Twierdzenie Knutha
+    <div class="grid-2">
+      <div class="panel">
+        <div class="ph ok">co daje najwięcej</div>
+        <div class="pb">
+          <div><b>Złożoność</b> — <code>Map</code>/<code>Set</code> O(1) zamiast <code>includes</code>/<code>indexOf</code> O(n); zagnieżdżone pętle zabijają duże dane</div>
+          <div><b>DOM</b> — batchuj zmiany; nie mieszaj odczytów geometrii (<code>offsetHeight</code>) z zapisami → wymuszony reflow</div>
+          <div><b>Asynchroniczność</b> — <code>Promise.all</code> zamiast sekwencyjnego <code>await</code>; ciężkie obliczenia do Web Workera</div>
+          <div><b>Kształt obiektów</b> — V8 lubi stałe kształty; dynamiczne dodawanie/usuwanie pól w hot path = deoptymalizacja</div>
+        </div>
       </div>
-      <div style="padding:14px 18px;display:flex;flex-direction:column;gap:8px;">
-        <div style="font-size:15px;font-style:italic;color:var(--text);line-height:1.5;">
-          „Premature optimization is the root of all evil."
-          <span style="font-style:normal;font-size:13px;color:var(--muted);margin-left:6px;">— Donald Knuth, 1974</span>
-        </div>
-        <div style="font-size:13px;color:var(--muted);line-height:1.6;">
-          Pełny cytat: <em>„We should forget about small efficiencies, say about 97% of the time: premature optimization is the root of all evil. Yet we should not pass up our opportunities in that critical 3%."</em>
-        </div>
-        <div style="font-size:13px;color:var(--accent);line-height:1.6;background:var(--accent-light);border:1px solid #bfdbfe;border-radius:var(--radius);padding:10px 14px;">
-          Reguła trzyma się mocno: <strong>zoptymalizuj algorytm i strukturę danych najpierw</strong> (O-notacja, lokalność cache, alokacje),
-          a mikro-optymalizacje JIT-a stosuj tylko w zmierzonych hot pathach.
-          Większość kodu aplikacyjnego nigdy nie powinna ich potrzebować —
-          i odwrotnie, w silnikach gier, parserach, runtime'ach czy bibliotekach numerycznych
-          mogą stanowić różnicę między działaniem a niedziałaniem.
+      <div class="panel">
+        <div class="ph bad">gdzie ucieka pamięć</div>
+        <div class="pb">
+          <div><b>Niewyrejestrowane</b> — listenery, <code>setInterval</code>, subskrypcje żyjące po usunięciu komponentu</div>
+          <div><b>Cache bez limitu</b> — rosnący w nieskończoność <code>Map</code>; użyj LRU lub <code>WeakMap</code></div>
+          <div><b>Detached DOM</b> — element usunięty z drzewa, ale trzymany przez zmienną JS</div>
+          <div><b>Niemutowalność</b> — <code>{...obj}</code> wszędzie generuje śmieci; w hot path czasem lepiej mutować</div>
         </div>
       </div>
     </div>
 
-    <div class="tip-bar">
-      <span class="tip-icon">📏</span>
-      <span class="tip-text">
-        <strong>Zanim zaczniesz optymalizować — zmierz.</strong>
-        DevTools Performance i Memory tab pokazują gdzie naprawdę leży problem.
-        Intuicja często zawodzi — profiler nie kłamie.
-      </span>
+    <div class="ascii"><span class="a">"Premature optimization is the root of all evil."</span>  — Donald Knuth, 1974
+
+pełny cytat: zapomnij o małych optymalizacjach w ~97% przypadków,
+<b>ale nie przegap krytycznych 3%</b> — i właśnie o te 3% jest ta prezentacja.</div>
+
+    <div class="tip">
+      <b>Profiler nie kłamie, intuicja często tak.</b> DevTools → Performance / Memory pokazują, gdzie naprawdę jest problem.
     </div>
 
   </div>

@@ -5,19 +5,20 @@ const SLIDES = [
   '03-pamiec.html',
   '04-kompilacjav8.html',
   '05-liczby.html',
-  '06-tablice.html',
-  '07-setandarray.html',
-  '08-mapandobject.html',
-  '09-numberarrays.html',
-  '10-hiddenclasses.html',
-  '11-deopt.html',
-  '12-weakmap.html',
-  '13-clone.html',
-  '14-arraybuffer.html',
-  '15-objectpool.html',
-  '16-workers.html',
-  '17-profiling.html',
-  '18-podsumowanie.html',
+  '06-stringi.html',
+  '07-tablice.html',
+  '08-setandarray.html',
+  '09-mapandobject.html',
+  '10-numberarrays.html',
+  '11-hiddenclasses.html',
+  '12-deopt.html',
+  '13-weakmap.html',
+  '14-clone.html',
+  '15-arraybuffer.html',
+  '16-objectpool.html',
+  '17-workers.html',
+  '18-profiling.html',
+  '19-podsumowanie.html',
 ];
 
 const TOTAL = SLIDES.length;
@@ -56,7 +57,7 @@ function initNav(currentIndex) {
     btnNext.classList.add('disabled');
   }
 
-  // Przyciski skrótów: początek, slajd 07, koniec
+  // Przyciski skrótów: początek, koniec
   const bottombar = document.getElementById('bottombar');
 
   function makeShortcut(label, href, disabled) {

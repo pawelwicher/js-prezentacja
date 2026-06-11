@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stringi | Techniki optymalizacyjne w JS</title>
+  <link rel="stylesheet" href="../assets/github.min.css" />
+  <script src="../assets/highlight.min.js"></script>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <span class="title">optymalizacja-js</span>
+    <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
+    <span class="counter" id="counter"></span>
+  </div>
+
+  <div id="slide">
+    <h1>stringi</h1>
+
+    <div class="clue">
+      String w V8 to nie zawsze płaski bufor — <b><code>a + b</code> to para wskaźników (rope)</b>,
+      a <b><code>substring</code> to widok na rodzica</b>. Konkatenacja jest tania, ale widok potrafi uwięzić megabajty.
+    </div>
+
+    <div class="grid-4">
+      <div class="panel">
+        <div class="ph">SeqString</div>
+        <div class="pb">
+          <div>Płaski bufor; <b>Latin-1 = 1 B/znak</b>, jeden „ż" przełącza cały string na 2 B/znak</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph ok">ConsString (rope)</div>
+        <div class="pb">
+          <div>Wynik <code>a + b</code> — <b>konkatenacja O(1)</b>; spłaszczany przy pierwszym odczycie znaku</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph warn">SlicedString</div>
+        <div class="pb">
+          <div><code>substring</code> ≥13 znaków = <b>widok</b>: wskaźnik + offset, zero kopiowania</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph info">Internalized</div>
+        <div class="pb">
+          <div>Literały i klucze pól: jeden egzemplarz, <b>porównanie wskaźnikiem O(1)</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="bench-panel">
+        <div class="bench-panel-header before">✗  substring więzi rodzica</div>
+        <pre><code class="language-javascript">const file = await resp.text();        // ~10 MB
+const header = file.substring(0, 64);  // widok!
+cache.set(url, header);
+// GC nie zbierze file, dopóki header żyje
+// — cache trzyma 10 MB, nie 64 B</code></pre>
+      </div>
+      <div class="bench-panel">
+        <div class="bench-panel-header after">✓  wymuś kopię, gdy wycinek ma żyć długo</div>
+        <pre><code class="language-javascript">const file = await resp.text();
+// konkatenacja → nowy, niezależny string
+const header = ('' + file.substring(0, 64)).slice(0);
+cache.set(url, header);                // 64 B</code></pre>
+      </div>
+    </div>
+
+    <div class="sec-label">benchmark — budowanie stringa z 2 000 części</div>
+    <div class="bench-layout">
+      <div class="bench-panel">
+        <div class="bench-panel-header after">✓  s += część — rope, O(1) na krok</div>
+        <pre><code class="language-javascript">let s = '';
+for (const part of parts) s += part;
+return s;   // flatten dopiero przy odczycie</code></pre>
+      </div>
+      <div class="bench-panel">
+        <div class="bench-panel-header before">✗  array.join('') — mit z epoki IE</div>
+        <pre><code class="language-javascript">const buf = [];
+for (const part of parts) buf.push(part);
+return buf.join('');</code></pre>
+      </div>
+    </div>
+    <div class="bench-run-row">
+      <button class="run-btn" id="run-btn-1" onclick="runBench1()">▶ run</button>
+      <span class="run-hint" id="hint-1">2 000 części, 1 000 powtórzeń — z odczytem znaku, żeby wliczyć flatten.</span>
+    </div>
+    <div id="results-1" style="width:100%;">
+      <div class="results-grid">
+        <div class="result-card">
+          <div class="rc-label">s += część</div>
+          <div class="rc-value good" id="r1-plus">—</div>
+          <div class="rc-sub">czas wykonania</div>
+        </div>
+        <div class="result-card">
+          <div class="rc-label">array.join('')</div>
+          <div class="rc-value bad" id="r1-join">—</div>
+          <div class="rc-sub">czas wykonania</div>
+        </div>
+        <div class="result-card">
+          <div class="rc-label">różnica</div>
+          <div class="rc-value highlight" id="r1-speedup">—</div>
+          <div class="rc-sub" id="r1-winner">szybszy wariant</div>
+        </div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-box">
+          <div class="bar-label good">s += część</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b1-plus" style="width:0%;background:var(--green)"></div></div>
+        </div>
+        <div class="bar-box">
+          <div class="bar-label bad">array.join('')</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b1-join" style="width:0%;background:var(--red)"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="bottombar">
+    <a class="nav-btn" id="btn-prev">← Poprzedni</a>
+    <div class="dots" id="dots"></div>
+    <a class="nav-btn" id="btn-next">Następny →</a>
+  </div>
+
+</div>
+<script src="../nav.js"></script>
+<script>
+  initNav();
+  hljs.highlightAll();
+
+  function fmtSpeedup(a, b) {
+    if (b < 0.001) return '> ×1000';
+    const s = a / b;
+    return s >= 1000 ? '×' + (s / 1000).toFixed(1) + 'k' : '×' + s.toFixed(1);
+  }
+
+  async function runBench1() {
+    const btn  = document.getElementById('run-btn-1');
+    const hint = document.getElementById('hint-1');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; pomiar…';
+    hint.textContent = '';
+
+    await new Promise(r => setTimeout(r, 60));
+
+    const PARTS  = 2_000;
+    const ITER   = 1_000;
+    const WARMUP = 100;
+
+    const parts = Array.from({ length: PARTS }, (_, i) => 'czesc_' + i);
+
+    // odczyt znaku wymusza flatten — uczciwy pomiar pełnego kosztu
+    function benchPlus() {
+      let s = '';
+      for (let i = 0; i < parts.length; i++) s += parts[i];
+      return s.charCodeAt(s.length - 1);
+    }
+    function benchJoin() {
+      const buf = [];
+      for (let i = 0; i < parts.length; i++) buf.push(parts[i]);
+      const s = buf.join('');
+      return s.charCodeAt(s.length - 1);
+    }
+
+    for (let i = 0; i < WARMUP; i++) benchPlus();
+    let t0 = performance.now();
+    for (let i = 0; i < ITER; i++) benchPlus();
+    const tPlus = (performance.now() - t0) / ITER;
+
+    await new Promise(r => setTimeout(r, 40));
+
+    for (let i = 0; i < WARMUP; i++) benchJoin();
+    t0 = performance.now();
+    for (let i = 0; i < ITER; i++) benchJoin();
+    const tJoin = (performance.now() - t0) / ITER;
+
+    const fmt = ms => (ms * 1000).toFixed(1) + ' µs';
+    document.getElementById('r1-plus').textContent = fmt(tPlus);
+    document.getElementById('r1-join').textContent = fmt(tJoin);
+    const winner = tPlus <= tJoin ? '+=' : 'join';
+    document.getElementById('r1-speedup').textContent = fmtSpeedup(Math.max(tPlus, tJoin), Math.min(tPlus, tJoin));
+    document.getElementById('r1-winner').textContent = `szybszy: ${winner}`;
+
+    const max = Math.max(tPlus, tJoin);
+    document.getElementById('b1-plus').style.width = (tPlus / max * 100).toFixed(1) + '%';
+    document.getElementById('b1-join').style.width = (tJoin / max * 100).toFixed(1) + '%';
+
+    btn.disabled = false;
+    btn.innerHTML = '↺ ponownie';
+    hint.textContent = 'Wyniki mogą się nieznacznie różnić między uruchomieniami.';
+  }
+</script>
+</body>
+</html>

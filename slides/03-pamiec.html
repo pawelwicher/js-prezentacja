@@ -3,581 +3,73 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Zarządzanie pamięcią | Techniki optymalizacyjne w JS</title>
-  <link rel="stylesheet" href="../assets/github.min.css" />
-  <script src="../assets/highlight.min.js"></script>
+  <title>Pamięć i GC | Techniki optymalizacyjne w JS</title>
   <link rel="stylesheet" href="../style.css" />
-  <style>
-    /* ── page tabs ── */
-    .mem-tabs {
-      display: flex;
-      gap: 4px;
-      align-self: flex-start;
-      border-bottom: 2px solid var(--border);
-      width: 100%;
-      padding-bottom: 0;
-    }
-    .mem-tab {
-      padding: 6px 18px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-      border: 1px solid transparent;
-      border-bottom: none;
-      border-radius: var(--radius) var(--radius) 0 0;
-      background: transparent;
-      transition: background 150ms, color 150ms;
-      margin-bottom: -2px;
-      user-select: none;
-    }
-    .mem-tab:hover { background: var(--bg); color: var(--text); }
-    .mem-tab.active {
-      background: var(--surface);
-      color: var(--accent);
-      border-color: var(--border);
-      border-bottom-color: var(--surface);
-    }
-    .mem-page { display: none; width: 100%; flex-direction: column; gap: 16px; }
-    .mem-page.active { display: flex; }
-
-    /* ── stack/heap columns ── */
-    .sh-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      width: 100%;
-    }
-    .sh-panel {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      background: var(--surface);
-    }
-    .sh-header {
-      padding: 10px 16px;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .07em;
-      border-bottom: 1px solid var(--border);
-    }
-    .sh-header.stack { background: var(--accent-light); color: var(--accent); }
-    .sh-header.heap  { background: var(--yellow-light); color: var(--yellow); }
-    .sh-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
-    .sh-item { font-size: 13px; color: var(--muted); display: flex; gap: 8px; }
-    .sh-item::before { content: "•"; color: var(--border); flex-shrink: 0; }
-    .sh-item strong { color: var(--text); }
-
-    /* ── GC diagram SVG ── */
-    .gc-diagram-wrap {
-      width: 100%;
-      display: flex;
-      gap: 16px;
-      align-items: flex-start;
-    }
-    .gc-svg-box {
-      flex: 1;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--surface);
-      overflow: hidden;
-    }
-    .gc-svg-box svg { display: block; width: 100%; height: auto; }
-    .gc-legend {
-      flex: 0 0 200px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      background: var(--surface);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .gc-legend-title {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .07em;
-      color: var(--muted);
-    }
-    .gc-legend-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      font-size: 12.5px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-    .gc-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      margin-top: 2px;
-    }
-
-    /* ── leak cards ── */
-    .leak-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      width: 100%;
-    }
-    .leak-card {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      background: var(--surface);
-      display: flex;
-      flex-direction: column;
-    }
-    .leak-card-header {
-      padding: 8px 14px;
-      font-size: 12px;
-      font-weight: 700;
-      background: var(--red-light);
-      color: var(--red);
-      border-bottom: 1px solid #fee2e2;
-    }
-    .leak-card-body {
-      padding: 10px 14px;
-      font-size: 12.5px;
-      color: var(--muted);
-      line-height: 1.55;
-      background: #f8f9fa;
-      border-bottom: 1px solid var(--border);
-    }
-    .leak-card-body code {
-      font-family: var(--mono);
-      font-size: 11.5px;
-      background: #f3f4f6;
-      padding: 1px 5px;
-      border-radius: 4px;
-    }
-    .leak-fix {
-      padding: 8px 14px;
-      font-size: 12px;
-      color: var(--green);
-      background: var(--green-light);
-      border-top: 1px solid #bbf7d0;
-      margin-top: auto;
-    }
-    .leak-code {
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      padding: 8px 10px;
-      font-family: var(--mono);
-      font-size: 10.5px;
-      line-height: 1.5;
-      color: #374151;
-      white-space: pre;
-      overflow-x: auto;
-    }
-    .leak-code .bad { color: #dc2626; }
-    .leak-code .good { color: #16a34a; }
-    .leak-code .cmt { color: #9ca3af; }
-
-    /* ── gen GC diagram ── */
-    .gen-diagram {
-      width: 100%;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--surface);
-      overflow: hidden;
-    }
-    .gen-diagram svg { display: block; width: 100%; height: auto; }
-
-    .tip-bar {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 18px;
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-    }
-    .tip-bar .tip-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-    .tip-bar .tip-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
-    .tip-bar .tip-text strong { color: var(--text); }
-  </style>
 </head>
 <body>
 <div id="app">
 
   <div id="topbar">
-    <span class="title">Optymalizacja JS — silnik V8</span>
+    <span class="title">optymalizacja-js</span>
     <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
     <span class="counter" id="counter"></span>
   </div>
 
   <div id="slide">
-    <h1>Zarządzanie pamięcią w JS</h1>
+    <h1>pamięć i GC</h1>
 
-    <div class="mem-tabs">
-      <button class="mem-tab active" onclick="showTab('basics')">Stos i sterta</button>
-      <button class="mem-tab" onclick="showTab('gc')">Mark-and-Sweep</button>
-      <button class="mem-tab" onclick="showTab('generational')">Generational GC</button>
-      <button class="mem-tab" onclick="showTab('leaks')">Wycieki pamięci</button>
+    <div class="clue">
+      GC nie liczy referencji — pyta: <b>„czy da się do mnie dojść od rootów?"</b>
+      (globalThis, call stack, timery, listenery). Co nieosiągalne, zostanie zebrane; co osiągalne przez przypadek — to wyciek.
     </div>
 
-    <!-- TAB 1: Stos i sterta -->
-    <div class="mem-page active" id="tab-basics">
-      <div class="sh-grid">
-        <div class="sh-panel">
-          <div class="sh-header stack">📦 Stos (Stack)</div>
-          <div class="sh-body">
-            <div class="sh-item"><strong>Prymitywy</strong> — number, boolean, string, null, undefined, symbol, bigint</div>
-            <div class="sh-item">Stały rozmiar, kopiowanie przez <strong>wartość</strong></div>
-            <div class="sh-item">Automatyczne zarządzanie — push/pop przy wywołaniach funkcji</div>
-            <div class="sh-item">Bardzo szybki dostęp (LIFO, ciągły blok)</div>
-          </div>
-        </div>
-        <div class="sh-panel">
-          <div class="sh-header heap">🌐 Sterta (Heap)</div>
-          <div class="sh-body">
-            <div class="sh-item"><strong>Obiekty, tablice, funkcje, domknięcia</strong></div>
-            <div class="sh-item">Zmienne trzymają <strong>referencje</strong> — dwa wskaźniki, jeden obiekt</div>
-            <div class="sh-item">Dynamiczny rozmiar, zarządza GC</div>
-            <div class="sh-item"><strong>Wycieki zawsze dotyczą sterty</strong> — nie stosu</div>
-          </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="ph info">stos</div>
+        <div class="pb">
+          <div><b>Ramki wywołań i małe wartości</b> — SMI, wskaźniki, zmienne lokalne; push/pop, bardzo szybki</div>
+          <div>Prymitywy mają <b>semantykę kopiowania przez wartość</b> — ale fizycznie string czy HeapNumber to obiekt na stercie</div>
+          <div>Zmienne złapane w domknięcia trafiają do obiektu <b>Context</b> na stercie</div>
         </div>
       </div>
-      <div class="code-block">
-        <div class="cb-header"><span>stos-sterta.js</span></div>
-        <pre><code class="language-javascript">let a = 5;          // wartość 5 na stosie
-let b = a;          // niezależna kopia — zmiana b nie rusza a
-
-let obj  = { x: 1 }; // obiekt na stercie, obj to referencja
-let obj2 = obj;       // ta sama referencja → ten sam obiekt
-obj2.x = 99;
-console.log(obj.x);  // 99 — oba wskazują to samo miejsce w pamięci</code></pre>
-      </div>
-      <div class="tip-bar">
-        <span class="tip-icon">🔄</span>
-        <span class="tip-text">
-          <strong>Cykl życia pamięci:</strong>
-          alokacja (tworzenie wartości) → użycie (odczyt/zapis) → zwolnienie (GC uznaje, że obiekt jest nieosiągalny).
-          GC nie pyta "ile referencji mnie wskazuje" — pyta "czy da się do mnie dojść od rootów".
-        </span>
+      <div class="panel">
+        <div class="ph warn">sterta</div>
+        <div class="pb">
+          <div><b>Obiekty, tablice, stringi, funkcje, domknięcia</b> — zarządza nimi GC</div>
+          <div>Zmienne trzymają <b>referencje</b> — dwa wskaźniki, jeden obiekt</div>
+          <div><b>Wycieki zawsze dotyczą sterty</b> — nie stosu</div>
+        </div>
       </div>
     </div>
 
-    <!-- TAB 2: Mark-and-Sweep -->
-    <div class="mem-page" id="tab-gc">
-      <div class="gc-diagram-wrap">
-        <div class="gc-svg-box">
-          <svg viewBox="0 0 560 210" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12">
-            <!-- roots area -->
-            <rect x="8" y="8" width="110" height="195" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
-            <text x="63" y="24" text-anchor="middle" font-size="10" font-weight="700" fill="#2563eb" letter-spacing=".06em">ROOTS</text>
-            <rect x="18" y="32" width="90" height="24" rx="4" fill="#2563eb" opacity=".12"/>
-            <text x="63" y="48" text-anchor="middle" font-size="11" fill="#1d4ed8" font-weight="600">globalThis</text>
-            <rect x="18" y="62" width="90" height="24" rx="4" fill="#2563eb" opacity=".12"/>
-            <text x="63" y="78" text-anchor="middle" font-size="11" fill="#1d4ed8" font-weight="600">call stack</text>
-            <rect x="18" y="92" width="90" height="24" rx="4" fill="#2563eb" opacity=".12"/>
-            <text x="63" y="108" text-anchor="middle" font-size="11" fill="#1d4ed8" font-weight="600">setInterval</text>
-            <rect x="18" y="122" width="90" height="24" rx="4" fill="#2563eb" opacity=".12"/>
-            <text x="63" y="138" text-anchor="middle" font-size="11" fill="#1d4ed8" font-weight="600">DOM listeners</text>
+    <div class="ascii"><b>GC generacyjny w V8</b> — większość obiektów umiera młodo (hipoteza generacyjna)
 
-            <!-- reachable objects — larger circles with more space -->
-            <circle cx="220" cy="55" r="36" fill="#bbf7d0" stroke="#16a34a" stroke-width="1.5"/>
-            <text x="220" y="51" text-anchor="middle" font-size="12" fill="#15803d" font-weight="600">user</text>
-            <text x="220" y="67" text-anchor="middle" font-size="10" fill="#15803d">osiągalny</text>
+<b>YOUNG (~1–16 MB) — Scavenge, pauza 1–5 ms</b>
 
-            <circle cx="330" cy="45" r="34" fill="#bbf7d0" stroke="#16a34a" stroke-width="1.5"/>
-            <text x="330" y="41" text-anchor="middle" font-size="12" fill="#15803d" font-weight="600">profile</text>
-            <text x="330" y="57" text-anchor="middle" font-size="10" fill="#15803d">osiągalny</text>
+[ from-space   |   to-space ]  ──── przeżył 2 cykle Scavenge ───→  <b>[ OLD (setki MB) ]</b>
+   ● ● ◌ ●       ← kopiuj                 (promocja)                Mark-Sweep-Compact:
+  kopiowane są tylko <b>żywe</b> obiekty —                                 rzadszy, inkrementalny,
+  martwych nikt nie dotyka                                          częściowo współbieżny
 
-            <circle cx="435" cy="40" r="34" fill="#bbf7d0" stroke="#16a34a" stroke-width="1.5"/>
-            <text x="435" y="36" text-anchor="middle" font-size="12" fill="#15803d" font-weight="600">avatar</text>
-            <text x="435" y="52" text-anchor="middle" font-size="10" fill="#15803d">osiągalny</text>
+<b>pułapka:</b> obiekt „na chwilę" przetrzymany przez listener/cache awansuje do OLD
+         i obciąża kosztowniejszy kolektor do końca życia aplikacji</div>
 
-            <circle cx="270" cy="148" r="36" fill="#bbf7d0" stroke="#16a34a" stroke-width="1.5"/>
-            <text x="270" y="144" text-anchor="middle" font-size="12" fill="#15803d" font-weight="600">cache</text>
-            <text x="270" y="160" text-anchor="middle" font-size="10" fill="#15803d">osiągalny</text>
-
-            <!-- unreachable: cycle -->
-            <circle cx="390" cy="150" r="34" fill="#fecaca" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4 2"/>
-            <text x="390" y="146" text-anchor="middle" font-size="11" fill="#b91c1c" font-weight="600">orphanA</text>
-            <text x="390" y="162" text-anchor="middle" font-size="10" fill="#b91c1c">cykl ↺</text>
-
-            <circle cx="500" cy="150" r="34" fill="#fecaca" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4 2"/>
-            <text x="500" y="146" text-anchor="middle" font-size="11" fill="#b91c1c" font-weight="600">orphanB</text>
-            <text x="500" y="162" text-anchor="middle" font-size="10" fill="#b91c1c">cykl ↺</text>
-
-            <!-- arrows roots → objects -->
-            <line x1="118" y1="44" x2="182" y2="50" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arr)"/>
-            <line x1="118" y1="74" x2="182" y2="62" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arr)"/>
-            <line x1="118" y1="108" x2="232" y2="128" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arr)"/>
-            <!-- obj arrows -->
-            <line x1="256" y1="48" x2="294" y2="45" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arr-g)"/>
-            <line x1="364" y1="42" x2="399" y2="40" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arr-g)"/>
-            <!-- cycle arrows -->
-            <path d="M 424 138 Q 445 122 466 138" stroke="#dc2626" stroke-width="1.5" fill="none" marker-end="url(#arr-r)"/>
-            <path d="M 466 164 Q 445 180 424 164" stroke="#dc2626" stroke-width="1.5" fill="none" marker-end="url(#arr-r)"/>
-
-            <defs>
-              <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-                <path d="M0,0 L7,3.5 L0,7 Z" fill="#2563eb"/>
-              </marker>
-              <marker id="arr-g" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-                <path d="M0,0 L7,3.5 L0,7 Z" fill="#16a34a"/>
-              </marker>
-              <marker id="arr-r" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-                <path d="M0,0 L7,3.5 L0,7 Z" fill="#dc2626"/>
-              </marker>
-            </defs>
-          </svg>
-        </div>
-        <div class="gc-legend">
-          <div class="gc-legend-title">Legenda</div>
-          <div class="gc-legend-item">
-            <div class="gc-dot" style="background:#2563eb"></div>
-            <span><strong>Roots</strong> — globalThis, call stack, timery, listenery DOM</span>
-          </div>
-          <div class="gc-legend-item">
-            <div class="gc-dot" style="background:#16a34a"></div>
-            <span><strong>Osiągalny</strong> — da się dojść od rootów → nie zostanie usunięty</span>
-          </div>
-          <div class="gc-legend-item">
-            <div class="gc-dot" style="background:#dc2626"></div>
-            <span><strong>Nieosiągalny</strong> — wyciek lub cykl → GC usunie przy następnym sweepie</span>
-          </div>
-        </div>
-      </div>
-      <div class="tip-bar">
-        <span class="tip-icon">♻️</span>
-        <span class="tip-text">
-          <strong>Reference counting (stary algorytm)</strong> nie radził sobie z cyklami — dwa obiekty wzajemnie się wskazujące
-          miały licznik = 1 i nigdy nie były zwalniane. <strong>Mark-and-sweep</strong> ten problem rozwiązuje,
-          bo patrzy z perspektywy osiągalności od rootów, a nie liczby referencji.
-        </span>
-      </div>
+    <div class="panel" style="width:100%;">
+      <div class="ph bad">top 5 wycieków — i jak je łatać</div>
+      <table class="t">
+        <tbody>
+          <tr><td class="mono">zmienna globalna</td><td>brak <code>let/const</code> → <code>window.x</code> żyje wiecznie</td><td class="mono">moduły ES / 'use strict'</td></tr>
+          <tr><td class="mono">zapomniany timer</td><td><code>setInterval</code> trzyma callback + wszystko, co domyka</td><td class="mono">clearInterval przy cleanup</td></tr>
+          <tr><td class="mono">listener DOM</td><td>handler i domknięcie żyją po usunięciu elementu</td><td class="mono">AbortController + signal</td></tr>
+          <tr><td class="mono">detached node</td><td>element poza drzewem, trzymany przez zmienną JS</td><td class="mono">nulluj referencje</td></tr>
+          <tr><td class="mono">cache bez limitu</td><td><code>Map</code> rośnie bez końca</td><td class="mono">LRU lub WeakMap</td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- TAB 3: Generational GC -->
-    <div class="mem-page" id="tab-generational">
-      <div style="display:flex;align-items:center;gap:10px;align-self:flex-start;">
-        <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);">Silnik:</span>
-        <span style="font-size:13px;font-weight:600;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 10px;">V8 (Chrome / Node.js)</span>
-        <span style="font-size:12px;color:var(--muted);">— SpiderMonkey (Firefox) i JavaScriptCore (Safari) stosują analogiczne podejście generacyjne</span>
-      </div>
-      <div class="sh-grid">
-        <div class="sh-panel">
-          <div class="sh-header stack">⚡ Young generation — algorytm Scavenge</div>
-          <div class="sh-body">
-            <div class="sh-item">Przestrzeń podzielona na dwie półprzestrzenie: <strong>From-space</strong> i <strong>To-space</strong> (łącznie ~1–8 MB)</div>
-            <div class="sh-item">Każdy nowy obiekt jest alokowany w From-space. Po jego zapełnieniu uruchamiany jest cykl <strong>Scavenge</strong> (algorytm Cheneya)</div>
-            <div class="sh-item">Kolektor kopiuje wyłącznie obiekty osiągalne do To-space, po czym obie półprzestrzenie zamieniają role</div>
-            <div class="sh-item"><strong>Martwe obiekty nie są usuwane explicite</strong> — całe From-space jest resetowane przez przesunięcie wskaźnika alokacji. Obiekty, których nikt nie skopiował, zostają nadpisane przy kolejnych alokacjach</div>
-            <div class="sh-item">Złożoność czasowa jest proporcjonalna do liczby <strong>żywych</strong> obiektów — wysoka śmiertelność przekłada się na krótki czas kolekcji</div>
-            <div class="sh-item">Typowa pauza: <strong>1–5 ms</strong>; cykl uruchamiany jest często, lecz przewidywalnie</div>
-          </div>
-        </div>
-        <div class="sh-panel">
-          <div class="sh-header heap">🏛️ Old generation — Mark-Sweep-Compact</div>
-          <div class="sh-body">
-            <div class="sh-item">Obiekty, które przeżyły co najmniej <strong>dwa cykle Scavenge</strong>, podlegają <em>promocji</em> do old generation</div>
-            <div class="sh-item"><strong>Mark</strong> — kolektor przechodzi graf osiągalności od rootów; faza wykonywana częściowo współbieżnie na dedykowanych wątkach</div>
-            <div class="sh-item"><strong>Sweep</strong> — nieosiągalne komórki są rejestrowane na listach wolnych bloków i udostępniane alokatorowi</div>
-            <div class="sh-item"><strong>Compact</strong> — żywe obiekty są zagęszczane w celu ograniczenia fragmentacji; uruchamiane selektywnie ze względu na koszt operacji</div>
-            <div class="sh-item">Pauzy są dłuższe, lecz praca jest rozbita <strong>inkrementalnie</strong> i <strong>współbieżnie</strong>, co eliminuje pojedyncze długie zatrzymania wątku JS</div>
-          </div>
-        </div>
-      </div>
-      <div class="gen-diagram">
-        <svg viewBox="0 0 600 195" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12">
-          <!-- young generation box -->
-          <rect x="8" y="24" width="268" height="165" rx="8" fill="#eff6ff" stroke="#93c5fd" stroke-width="2"/>
-          <text x="142" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="#2563eb" letter-spacing=".05em">YOUNG GENERATION (~1–8 MB)</text>
-
-          <!-- from-space -->
-          <rect x="18" y="34" width="114" height="90" rx="5" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
-          <text x="75" y="50" text-anchor="middle" font-size="11" font-weight="700" fill="#1d4ed8">From-space</text>
-          <circle cx="42" cy="82" r="16" fill="#93c5fd" stroke="#2563eb" stroke-width="1"/>
-          <text x="42" y="87" text-anchor="middle" font-size="12" fill="#1e40af" font-weight="600">A</text>
-          <circle cx="78" cy="96" r="14" fill="#93c5fd" stroke="#2563eb" stroke-width="1"/>
-          <text x="78" y="101" text-anchor="middle" font-size="12" fill="#1e40af" font-weight="600">B</text>
-          <circle cx="112" cy="78" r="13" fill="#e0e7ff" stroke="#6366f1" stroke-width="1" stroke-dasharray="3 2"/>
-          <text x="112" y="83" text-anchor="middle" font-size="10" fill="#4338ca">dead</text>
-
-          <!-- to-space -->
-          <rect x="144" y="34" width="120" height="90" rx="5" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
-          <text x="204" y="50" text-anchor="middle" font-size="11" font-weight="700" fill="#15803d">To-space</text>
-          <text x="204" y="88" text-anchor="middle" font-size="11" fill="#4ade80">← kopiuj</text>
-          <text x="204" y="104" text-anchor="middle" font-size="11" fill="#4ade80">żywe</text>
-
-          <!-- scavenge label + arrow -->
-          <path d="M 75 132 Q 142 154 204 132" stroke="#2563eb" stroke-width="1.5" fill="none" marker-end="url(#arr2)" stroke-dasharray="5 3"/>
-          <text x="140" y="170" text-anchor="middle" font-size="10" fill="#2563eb" font-weight="600">Scavenge (~1–5 ms)</text>
-
-          <!-- promotion arrow -->
-          <path d="M 276 95 L 322 95" stroke="#d97706" stroke-width="2.5" marker-end="url(#arr-y)" fill="none"/>
-          <text x="299" y="88" text-anchor="middle" font-size="10" fill="#d97706" font-weight="700">promotion</text>
-          <text x="299" y="108" text-anchor="middle" font-size="10" fill="#d97706">(2 cykle)</text>
-
-          <!-- old generation box -->
-          <rect x="322" y="24" width="270" height="165" rx="8" fill="#fffbeb" stroke="#fcd34d" stroke-width="2"/>
-          <text x="457" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="#d97706" letter-spacing=".05em">OLD GENERATION (setki MB)</text>
-
-          <!-- veteran circles — bigger, text fits -->
-          <circle cx="362" cy="72" r="26" fill="#fde68a" stroke="#d97706" stroke-width="1.5"/>
-          <text x="362" y="69" text-anchor="middle" font-size="11" fill="#92400e" font-weight="600">obj1</text>
-          <text x="362" y="83" text-anchor="middle" font-size="9" fill="#92400e">weteran</text>
-
-          <circle cx="422" cy="58" r="24" fill="#fde68a" stroke="#d97706" stroke-width="1.5"/>
-          <text x="422" y="63" text-anchor="middle" font-size="11" fill="#92400e" font-weight="600">obj2</text>
-
-          <circle cx="476" cy="80" r="26" fill="#fde68a" stroke="#d97706" stroke-width="1.5"/>
-          <text x="476" y="77" text-anchor="middle" font-size="11" fill="#92400e" font-weight="600">obj3</text>
-          <text x="476" y="91" text-anchor="middle" font-size="9" fill="#92400e">weteran</text>
-
-          <circle cx="540" cy="62" r="22" fill="#fde68a" stroke="#d97706" stroke-width="1.5"/>
-          <text x="540" y="67" text-anchor="middle" font-size="11" fill="#92400e" font-weight="600">obj4</text>
-
-          <!-- mark-sweep label -->
-          <rect x="334" y="118" width="246" height="58" rx="5" fill="#fffde7" stroke="#fcd34d" stroke-width="1"/>
-          <text x="457" y="136" text-anchor="middle" font-size="11" font-weight="700" fill="#d97706">Mark-Sweep-Compact</text>
-          <text x="457" y="153" text-anchor="middle" font-size="10" fill="#6b7280">rzadszy, inkrementalny,</text>
-          <text x="457" y="168" text-anchor="middle" font-size="10" fill="#6b7280">częściowo współbieżny</text>
-
-          <defs>
-            <marker id="arr2" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-              <path d="M0,0 L7,3.5 L0,7 Z" fill="#2563eb"/>
-            </marker>
-            <marker id="arr-y" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-              <path d="M0,0 L7,3.5 L0,7 Z" fill="#d97706"/>
-            </marker>
-          </defs>
-        </svg>
-      </div>
-      <div class="tip-bar">
-        <span class="tip-icon">💡</span>
-        <span class="tip-text">
-          <strong>Hipoteza generacyjna</strong> (generational hypothesis): empiryczna obserwacja, że zdecydowana większość obiektów ma krótki czas życia.
-          V8 eksploatuje tę właściwość, stosując dwa odrębne kolektory o różnych charakterystykach czasowych.
-          Promocja do old generation jest punktem krytycznym — obiekt, który miał żyć przez milisekundy, a awansował
-          wskutek niezwolnionego listenera lub nieograniczonego cache'a, będzie obciążał kosztowniejszy cykl Mark-Sweep-Compact przez cały czas życia aplikacji.
-        </span>
-      </div>
-    </div>
-
-    <!-- TAB 4: Wycieki pamięci -->
-    <div class="mem-page" id="tab-leaks">
-      <div class="leak-grid">
-        <div class="leak-card">
-          <div class="leak-card-header">1. Zmienne globalne</div>
-          <div class="leak-card-body">
-            Brak <code>let/const/var</code> tworzy zmienną globalną żyjącą przez cały czas aplikacji.
-          </div>
-          <div class="leak-code"><span class="bad">function load() {
-  data = fetchAll(); <span class="cmt">// brak let → window.data</span>
-}</span>
-<span class="good">function load() {
-  const data = fetchAll(); <span class="cmt">// lokalna</span>
-}</span></div>
-          <div class="leak-fix">✓ Zawsze <code>'use strict'</code> lub moduły ES</div>
-        </div>
-        <div class="leak-card">
-          <div class="leak-card-header">2. Zapomniane timery</div>
-          <div class="leak-card-body">
-            <code>setInterval</code> trzyma referencję do callbacka, a callback do wszystkiego, co domyka.
-          </div>
-          <div class="leak-code"><span class="bad">setInterval(() => {
-  el.textContent = getData();
-}, 1000); <span class="cmt">// nigdy nie jest czyszczony</span></span>
-<span class="good">const id = setInterval(() => {
-  el.textContent = getData();
-}, 1000);
-onDestroy(() => clearInterval(id));</span></div>
-          <div class="leak-fix">✓ Zapisuj ID, wołaj <code>clearInterval(id)</code> przy cleanup</div>
-        </div>
-        <div class="leak-card">
-          <div class="leak-card-header">3. Listenery DOM</div>
-          <div class="leak-card-body">
-            Listener i jego domknięcie (np. <code>heavyContext</code>) zostają w pamięci po usunięciu elementu.
-          </div>
-          <div class="leak-code"><span class="bad">const big = new Array(1e6).fill(0);
-btn.addEventListener('click', () => {
-  use(big); <span class="cmt">// big żyje tak długo jak btn</span>
-});</span>
-<span class="good">const ac = new AbortController();
-btn.addEventListener('click', handler,
-  { signal: ac.signal });
-onDestroy(() => ac.abort());</span></div>
-          <div class="leak-fix">✓ <code>AbortController</code> lub <code>removeEventListener</code></div>
-        </div>
-        <div class="leak-card">
-          <div class="leak-card-header">4. Detached nodes</div>
-          <div class="leak-card-body">
-            Element usunięty z DOM, ale wciąż trzymany przez zmienną JS lub cache.
-            Widoczny w DevTools jako "Detached HTMLElement".
-          </div>
-          <div class="leak-code"><span class="bad">const rows = [];
-function addRow() {
-  const tr = table.insertRow();
-  rows.push(tr); <span class="cmt">// rows trzyma usunięte</span>
-  table.remove();
-}</span>
-<span class="good">let rowRef = null;
-rowRef = table.insertRow();
-table.remove();
-rowRef = null; <span class="cmt">// GC może zebrać</span></span></div>
-          <div class="leak-fix">✓ Nulluj referencje po usunięciu z DOM</div>
-        </div>
-        <div class="leak-card">
-          <div class="leak-card-header">5. Cache bez limitu</div>
-          <div class="leak-card-body">
-            Nieskończenie rosnący <code>cache = {}</code> lub <code>Map</code> z setkami tysięcy wpisów.
-          </div>
-          <div class="leak-code"><span class="bad">const cache = new Map();
-function get(key) {
-  if (!cache.has(key))
-    cache.set(key, compute(key));
-  return cache.get(key); <span class="cmt">// rośnie bez końca</span>
-}</span>
-<span class="good">const cache = new WeakMap();
-<span class="cmt">// klucz-obiekt → GC może zebrać wpis</span>
-function get(obj) {
-  if (!cache.has(obj))
-    cache.set(obj, compute(obj));
-  return cache.get(obj);
-}</span></div>
-          <div class="leak-fix">✓ LRU cache lub <code>WeakMap</code> (klucze mogą być GC-owane)</div>
-        </div>
-        <div class="leak-card">
-          <div class="leak-card-header">6. Closures uwięziające kontekst</div>
-          <div class="leak-card-body">
-            Domknięcie używa tylko <code>small</code>, ale gdy jest <code>eval</code> / <code>with</code> — całe scope zostaje.
-          </div>
-          <div class="leak-code"><span class="bad">function outer() {
-  const big = new Array(1e6);
-  const small = 42;
-  return () => {
-    eval(''); <span class="cmt">// zatrzymuje całe scope</span>
-    return small;
-  };
-}</span>
-<span class="good">function outer() {
-  const big = new Array(1e6);
-  const small = 42;
-  return () => small; <span class="cmt">// big może być GC</span>
-}</span></div>
-          <div class="leak-fix">✓ Przekazuj tylko to, co potrzebne; unikaj <code>eval</code></div>
-        </div>
-      </div>
-      <div class="tip-bar">
-        <span class="tip-icon">🔬</span>
-        <span class="tip-text">
-          <strong>Diagnostyka w Chrome DevTools → Memory:</strong>
-          <em>Heap snapshot</em> — porównaj dwa snapshoty, szukaj rosnących struktur;
-          <em>Allocation on timeline</em> — kiedy i co alokuje;
-          <em>Performance → Memory</em> — schodkowy wykres po każdym GC to klasyczny sygnał wycieku.
-          W Node.js: <code>--inspect</code> + DevTools lub <code>process.memoryUsage()</code>.
-        </span>
-      </div>
+    <div class="tip">
+      <b>Diagnostyka:</b> DevTools → Memory → dwa heap snapshoty + Comparison; schodkowy wykres pamięci po każdym GC = klasyczny sygnał wycieku.
+      Node: <code>--inspect</code> lub <code>process.memoryUsage()</code>.
     </div>
 
   </div>
@@ -590,18 +82,6 @@ function get(obj) {
 
 </div>
 <script src="../nav.js"></script>
-<script>
-  initNav();
-  hljs.highlightAll();
-
-  function showTab(name) {
-    document.querySelectorAll('.mem-tab').forEach((t, i) => {
-      const pages = ['basics', 'gc', 'generational', 'leaks'];
-      t.classList.toggle('active', pages[i] === name);
-    });
-    document.querySelectorAll('.mem-page').forEach(p => p.classList.remove('active'));
-    document.getElementById('tab-' + name).classList.add('active');
-  }
-</script>
+<script>initNav();</script>
 </body>
 </html>

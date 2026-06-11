@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Klonowanie obiektów | Techniki optymalizacyjne w JS</title>
+  <title>Klonowanie | Techniki optymalizacyjne w JS</title>
   <link rel="stylesheet" href="../assets/github.min.css" />
   <script src="../assets/highlight.min.js"></script>
   <link rel="stylesheet" href="../style.css" />
@@ -12,177 +12,111 @@
 <div id="app">
 
   <div id="topbar">
-    <span class="title">Optymalizacja JS — silnik V8</span>
+    <span class="title">optymalizacja-js</span>
     <img src="../assets/psei.png" alt="PSE Innowacje" style="height:28px;" />
     <span class="counter" id="counter"></span>
   </div>
 
   <div id="slide">
-    <h2>Klonowanie obiektów</h2>
+    <h1>klonowanie obiektów</h1>
 
-    <!-- Charakterystyka 4 metod -->
-    <div style="width:100%;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:4px;">
+    <div class="clue">
+      Płytko: <b>spread</b> — V8 zna kształt i kopiuje pola wprost. Głęboko: <b>structuredClone</b> — poprawny semantycznie
+      (Date, Map, cykle). <b>JSON round-trip</b> tylko gdy dane są na pewno JSON-owe.
+    </div>
 
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;padding:7px 12px;letter-spacing:.03em;border-bottom:1px solid var(--border);">SPREAD <code style="font-size:10px">{ ...obj }</code></div>
-        <div style="padding:8px 12px;font-size:11px;line-height:1.65;color:var(--text);display:flex;flex-direction:column;gap:3px;">
-          <div><strong>Głębokość</strong> — płytka (shallow); zagnieżdżone obiekty to nadal ta sama referencja</div>
-          <div><strong>Szybkość</strong> — najszybsza metoda; V8 zna kształt obiektu (hidden class) i kopiuje pola bezpośrednio</div>
-          <div><strong>Prototype</strong> — nie kopiuje; wynik ma <code style="font-family:var(--mono);font-size:10px">Object.prototype</code></div>
-          <div><strong>Gettery</strong> — wywołuje getter, zapisuje wartość (nie kopuje deskryptora)</div>
-          <div><strong>Kiedy</strong> — płaskie obiekty konfiguracyjne, akcje Redux, props</div>
+    <div class="panel" style="width:100%;">
+      <table class="t">
+        <thead>
+          <tr><th>metoda</th><th>głębokość</th><th>traci / psuje</th><th>kiedy</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">{ ...obj }</td><td><b>płytka</b></td><td>prototyp, deskryptory (gettery → wartości)</td><td>płaskie obiekty, props, akcje</td></tr>
+          <tr><td class="mono">Object.assign({}, obj)</td><td><b>płytka</b></td><td>jak spread; można scalać wiele źródeł</td><td>scalanie opcji z domyślnymi</td></tr>
+          <tr><td class="mono">JSON.parse(JSON.stringify())</td><td>pełna</td><td><code>undefined</code>, funkcje, <code>Map/Set</code> → <code>{}</code>, <code>Date</code> → string; <b>cykl → wyjątek</b></td><td>tylko dane czysto JSON-owe</td></tr>
+          <tr><td class="mono">structuredClone(obj)</td><td>pełna</td><td>funkcje i symbole → wyjątek; gubi prototyp klasy</td><td>złożone dane: Date, Map, Set, cykle</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sec-label">benchmark 1 — płytkie klonowanie (20 pól)</div>
+    <div class="bench-run-row">
+      <button class="run-btn" id="run-btn-1" onclick="runBench1()">▶ run</button>
+      <span class="run-hint" id="hint-1">płaski obiekt z 20 polami, 100 000 powtórzeń.</span>
+    </div>
+    <div id="results-1" style="width:100%;">
+      <div class="results-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="result-card">
+          <div class="rc-label">spread</div>
+          <div class="rc-value good" id="r1-spread">—</div>
+          <div class="rc-sub">czas wykonania</div>
+        </div>
+        <div class="result-card">
+          <div class="rc-label">Object.assign</div>
+          <div class="rc-value" id="r1-assign">—</div>
+          <div class="rc-sub">czas wykonania</div>
+        </div>
+        <div class="result-card">
+          <div class="rc-label">JSON round-trip</div>
+          <div class="rc-value bad" id="r1-json">—</div>
+          <div class="rc-sub">czas wykonania</div>
+        </div>
+        <div class="result-card">
+          <div class="rc-label">JSON vs spread</div>
+          <div class="rc-value highlight" id="r1-speedup">—</div>
+          <div class="rc-sub">spread szybszy o</div>
         </div>
       </div>
-
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;padding:7px 12px;letter-spacing:.03em;border-bottom:1px solid var(--border);">OBJECT.ASSIGN</div>
-        <div style="padding:8px 12px;font-size:11px;line-height:1.65;color:var(--text);display:flex;flex-direction:column;gap:3px;">
-          <div><strong>Głębokość</strong> — płytka; semantycznie identyczna ze spreadem dla prostych przypadków</div>
-          <div><strong>Szybkość</strong> — nieznacznie wolniejsza od spreadu; wywołuje wewnętrzny mechanizm przypisania per-klucz</div>
-          <div><strong>Prototype</strong> — nie kopiuje; można scalać wiele źródeł naraz</div>
-          <div><strong>Gettery</strong> — tak samo jak spread: wywołuje i zapisuje wartość</div>
-          <div><strong>Kiedy</strong> — scalanie domyślnych opcji z przekazanymi; migracja starszego kodu</div>
+      <div class="bar-row">
+        <div class="bar-box">
+          <div class="bar-label good">spread</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b1-spread" style="width:0%;background:var(--green)"></div></div>
         </div>
-      </div>
-
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;padding:7px 12px;letter-spacing:.03em;border-bottom:1px solid var(--border);">JSON ROUND-TRIP</div>
-        <div style="padding:8px 12px;font-size:11px;line-height:1.65;color:var(--text);display:flex;flex-direction:column;gap:3px;">
-          <div><strong>Głębokość</strong> — pełna (deep); serializuje całe drzewo do tekstu i parsuje od nowa</div>
-          <div><strong>Szybkość</strong> — wolna; serializacja + parsowanie + alokacja stringów pośrednich</div>
-          <div><strong>Ograniczenia</strong> — gubi <code style="font-family:var(--mono);font-size:10px">undefined</code>, <code style="font-family:var(--mono);font-size:10px">Date</code>, <code style="font-family:var(--mono);font-size:10px">Map</code>, <code style="font-family:var(--mono);font-size:10px">Set</code>, funkcje, cykliczne referencje → rzuca błąd</div>
-          <div><strong>Kiedy</strong> — nigdy jako pierwsza opcja; tylko gdy masz pewność że dane są serializowalne JSON</div>
+        <div class="bar-box">
+          <div class="bar-label warn">Object.assign</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b1-assign" style="width:0%;background:var(--yellow)"></div></div>
         </div>
-      </div>
-
-      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;padding:7px 12px;letter-spacing:.03em;border-bottom:1px solid var(--border);">STRUCTUREDCLONE</div>
-        <div style="padding:8px 12px;font-size:11px;line-height:1.65;color:var(--text);display:flex;flex-direction:column;gap:3px;">
-          <div><strong>Głębokość</strong> — pełna (deep); używa algorytmu Structured Clone z Web API</div>
-          <div><strong>Szybkość</strong> — najwolniejsza; przechodzi przez C++ Web API, obsługuje cykliczne referencje i wiele typów</div>
-          <div><strong>Obsługuje</strong> — <code style="font-family:var(--mono);font-size:10px">Date</code>, <code style="font-family:var(--mono);font-size:10px">Map</code>, <code style="font-family:var(--mono);font-size:10px">Set</code>, <code style="font-family:var(--mono);font-size:10px">ArrayBuffer</code>, cykliczne referencje</div>
-          <div><strong>Nie obsługuje</strong> — funkcji, klas z metodami, <code style="font-family:var(--mono);font-size:10px">Symbol</code></div>
-          <div><strong>Kiedy</strong> — głęboka kopia złożonych danych; dane z Web Workerów</div>
+        <div class="bar-box">
+          <div class="bar-label bad">JSON round-trip</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b1-json" style="width:0%;background:var(--red)"></div></div>
         </div>
       </div>
     </div>
 
-    <!-- Benchmark 1: płytkie klonowanie -->
-    <div style="margin-bottom:10px;width:100%;">
-      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;">BENCHMARK 1 — Płytkie klonowanie (spread vs Object.assign vs JSON)</div>
-      <div class="bench-layout" style="grid-template-columns:1fr 1fr 1fr;">
-        <div class="bench-panel">
-          <div class="bench-panel-header after">✓ &nbsp;Spread — najszybszy</div>
-          <pre><code class="language-javascript">const clone = { ...obj };</code></pre>
-        </div>
-        <div class="bench-panel">
-          <div class="bench-panel-header neutral" style="background:#f5f5f5;color:#555;">~ &nbsp;Object.assign</div>
-          <pre><code class="language-javascript">const clone = Object.assign({}, obj);</code></pre>
-        </div>
-        <div class="bench-panel">
-          <div class="bench-panel-header before">✗ &nbsp;JSON — serializacja do stringa i z powrotem</div>
-          <pre><code class="language-javascript">const clone = JSON.parse(JSON.stringify(obj));</code></pre>
-        </div>
-      </div>
-      <div class="bench-run-row" style="margin-top:8px;margin-bottom:12px;">
-        <button class="run-btn" id="run-btn-1" onclick="runBench1()">▶ Uruchom benchmark 1</button>
-        <span class="run-hint" id="hint-1">Płaski obiekt z 20 polami, 100 000 powtórzeń.</span>
-      </div>
-      <div id="results-1">
-        <div class="results-grid" style="grid-template-columns:repeat(4,1fr);">
-          <div class="result-card">
-            <div class="rc-label">Spread</div>
-            <div class="rc-value good" id="r1-spread">—</div>
-            <div class="rc-sub">czas wykonania</div>
-          </div>
-          <div class="result-card">
-            <div class="rc-label">Object.assign</div>
-            <div class="rc-value" id="r1-assign" style="color:var(--text);">—</div>
-            <div class="rc-sub">czas wykonania</div>
-          </div>
-          <div class="result-card">
-            <div class="rc-label">JSON round-trip</div>
-            <div class="rc-value bad" id="r1-json">—</div>
-            <div class="rc-sub">czas wykonania</div>
-          </div>
-          <div class="result-card">
-            <div class="rc-label">JSON vs Spread</div>
-            <div class="rc-value highlight" id="r1-speedup">—</div>
-            <div class="rc-sub">spread szybszy o</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:12px;width:100%;">
-          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
-            <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:6px;">Spread</div>
-            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b1-spread" style="width:0%;background:var(--green)"></div></div>
-          </div>
-          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px;">Object.assign</div>
-            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b1-assign" style="width:0%;background:#aaa"></div></div>
-          </div>
-          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
-            <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:6px;">JSON round-trip</div>
-            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b1-json" style="width:0%;background:var(--red)"></div></div>
-          </div>
-        </div>
-      </div>
+    <div class="sec-label">benchmark 2 — głębokie klonowanie (JSON vs structuredClone)</div>
+    <div class="bench-run-row">
+      <button class="run-btn" id="run-btn-2" onclick="runBench2()">▶ run</button>
+      <span class="run-hint" id="hint-2">zagnieżdżony obiekt, 3 poziomy, 5 000 powtórzeń.</span>
     </div>
-
-    <!-- Benchmark 2: głębokie klonowanie -->
-    <div style="width:100%;">
-      <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px;letter-spacing:.04em;">BENCHMARK 2 — Głębokie klonowanie (JSON vs structuredClone)</div>
-      <div class="bench-layout">
-        <div class="bench-panel">
-          <div class="bench-panel-header before">✗ &nbsp;JSON — traci typy (Date → string, Map → {})</div>
-          <pre><code class="language-javascript">// Szybsze niż structuredClone, ale gubi typy:
-// new Date() staje się stringiem ISO
-// new Map() staje się pustym {}
-// undefined, Symbol, funkcje znikają
-const clone = JSON.parse(JSON.stringify(deep));</code></pre>
+    <div id="results-2" style="width:100%;">
+      <div class="results-grid">
+        <div class="result-card">
+          <div class="rc-label">JSON round-trip</div>
+          <div class="rc-value bad" id="r2-json">—</div>
+          <div class="rc-sub">czas wykonania</div>
         </div>
-        <div class="bench-panel">
-          <div class="bench-panel-header after">✓ &nbsp;structuredClone — zachowuje Date, Map, Set, cykle</div>
-          <pre><code class="language-javascript">// Wolniejsze, ale poprawne semantycznie:
-// Date pozostaje Date
-// Map pozostaje Map
-// cykliczne referencje nie rzucają błędu
-const clone = structuredClone(deep);</code></pre>
+        <div class="result-card">
+          <div class="rc-label">structuredClone</div>
+          <div class="rc-value good" id="r2-sc">—</div>
+          <div class="rc-sub">czas wykonania</div>
+        </div>
+        <div class="result-card">
+          <div class="rc-label">różnica</div>
+          <div class="rc-value highlight" id="r2-speedup">—</div>
+          <div class="rc-sub">który wolniejszy</div>
         </div>
       </div>
-      <div class="bench-run-row" style="margin-top:8px;margin-bottom:12px;">
-        <button class="run-btn" id="run-btn-2" onclick="runBench2()">▶ Uruchom benchmark 2</button>
-        <span class="run-hint" id="hint-2">Zagnieżdżony obiekt 3 poziomy głęboki, 5 000 powtórzeń.</span>
-      </div>
-      <div id="results-2">
-        <div class="results-grid">
-          <div class="result-card">
-            <div class="rc-label">JSON round-trip</div>
-            <div class="rc-value bad" id="r2-json">—</div>
-            <div class="rc-sub">czas wykonania</div>
-          </div>
-          <div class="result-card">
-            <div class="rc-label">structuredClone</div>
-            <div class="rc-value good" id="r2-sc">—</div>
-            <div class="rc-sub">czas wykonania</div>
-          </div>
-          <div class="result-card">
-            <div class="rc-label">Różnica</div>
-            <div class="rc-value highlight" id="r2-speedup">—</div>
-            <div class="rc-sub">który wolniejszy</div>
-          </div>
+      <div class="bar-row">
+        <div class="bar-box">
+          <div class="bar-label bad">JSON round-trip</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b2-json" style="width:0%;background:var(--red)"></div></div>
         </div>
-        <div style="display:flex;gap:12px;width:100%;">
-          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
-            <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:6px;">JSON round-trip</div>
-            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b2-json" style="width:0%;background:var(--red)"></div></div>
-          </div>
-          <div style="flex:1;border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;">
-            <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:6px;">structuredClone</div>
-            <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b2-sc" style="width:0%;background:var(--green)"></div></div>
-          </div>
+        <div class="bar-box">
+          <div class="bar-label good">structuredClone</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="b2-sc" style="width:0%;background:var(--green)"></div></div>
         </div>
-        <div id="sc-note" style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;"></div>
       </div>
+      <div id="sc-note" style="font-size:11.5px;color:var(--muted);margin-top:6px;text-align:center;"></div>
     </div>
 
   </div>
@@ -216,7 +150,7 @@ const clone = structuredClone(deep);</code></pre>
     const btn  = document.getElementById('run-btn-1');
     const hint = document.getElementById('hint-1');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; pomiar…';
     hint.textContent = '';
 
     await new Promise(r => setTimeout(r, 60));
@@ -258,9 +192,8 @@ const clone = structuredClone(deep);</code></pre>
     document.getElementById('r1-speedup').textContent = fmtSpeedup(tJson, tSpread);
     setBars(['b1-spread', 'b1-assign', 'b1-json'], [tSpread, tAssign, tJson]);
 
-    document.getElementById('results-1').classList.add('visible');
     btn.disabled = false;
-    btn.innerHTML = '↺ Uruchom ponownie';
+    btn.innerHTML = '↺ ponownie';
     hint.textContent = 'Wyniki mogą się nieznacznie różnić między uruchomieniami.';
   }
 
@@ -268,7 +201,7 @@ const clone = structuredClone(deep);</code></pre>
     const btn  = document.getElementById('run-btn-2');
     const hint = document.getElementById('hint-2');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>&nbsp; Trwa pomiar…';
+    btn.innerHTML = '<span class="spinner"></span>&nbsp; pomiar…';
     hint.textContent = '';
 
     await new Promise(r => setTimeout(r, 60));
@@ -315,9 +248,8 @@ const clone = structuredClone(deep);</code></pre>
     document.getElementById('sc-note').textContent =
       `${slower} jest wolniejszy — ale structuredClone zachowuje Date jako Date, JSON zamienia ją w string.`;
 
-    document.getElementById('results-2').classList.add('visible');
     btn.disabled = false;
-    btn.innerHTML = '↺ Uruchom ponownie';
+    btn.innerHTML = '↺ ponownie';
     hint.textContent = 'Wyniki mogą się nieznacznie różnić między uruchomieniami.';
   }
 </script>
